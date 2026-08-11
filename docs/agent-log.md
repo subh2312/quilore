@@ -1,6 +1,14 @@
 # Agent Log
 
 - **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** (pending)
+- **What:** Implemented Story 16.4 CI/CD pipeline and environment promotion — GHCR image publish, staging→production promotion, rollback workflows, compose overlays, and deploy script tests.
+- **Why:** Plane story `c910a2a8-ae5a-4818-87aa-1bdbdc56f26a` / backlog Story 16.4 requires automated build/test, versioned artifacts, defined promotion, and tested rollback. Plane MCP was unavailable in this environment; acceptance criteria taken from `docs/quilore-plane-backlog.md`.
+- **How:** Extended `.github/workflows/ci.yml` with Docker image builds and deploy-tooling tests; added `publish-images.yml`, `promote.yml`, and `rollback.yml`; added `deploy/` overlays + `promote.sh`/`rollback.sh`/`apply-env.sh` with contract tests. Did not reintroduce the previously reverted orchestrator PR-evidence workflows.
+
+- **Date:** 2026-08-11
 - **Tool:** gemini
 - **Branch:** gemini
 - **What:** Fixed blocking CI issues to prepare gemini branch for merging into dev.
