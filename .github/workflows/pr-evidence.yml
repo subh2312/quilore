@@ -1,0 +1,44 @@
+name: PR Evidence — Antigravity Review
+
+# Calls the Quilore AI Team Orchestrator (self-hosted on the VPS, exposed via
+# Cloudflare Tunnel) after CI runs on a PR into dev/main, so Gemini can post
+# an advisory review, and again when the PR is merged/closed so the freed
+# Cursor/Copilot lane can pick up its next unblocked story immediately. See
+# AGENTS.md and the orchestrator's own README for the full pipeline.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [dev, main]
+
+jobs:
+  notify-orchestrator:
+    name: Notify Antigravity Orchestrator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract Plane ID and agent
+        id: extract
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          PLANE_ID=$(echo "$BRANCH" | grep -oE '[A-Z]+-[0-9]+' | head -n1 || true)
+          AGENT="unknown"
+          if echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q 'agent:cursor'; then AGENT="cursor"; fi
+          if echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q 'agent:copilot'; then AGENT="copilot"; fi
+          echo "plane_id=$PLANE_ID" >> "$GITHUB_OUTPUT"
+          echo "agent=$AGENT" >> "$GITHUB_OUTPUT"
+
+      - name: Call orchestrator
+        env:
+          ORCHESTRATOR_URL: ${{ secrets.AI_ORCHESTRATOR_URL }}
+          ORCHESTRATOR_TOKEN: ${{ secrets.AI_ORCHESTRATOR_TOKEN }}
+        run: |
+          curl -sf -X POST "$ORCHESTRATOR_URL/v1/github/pr-review" \
+            -H "Authorization: Bearer $ORCHESTRATOR_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "pr_number": ${{ github.event.pull_request.number }},
+              "plane_id": "${{ steps.extract.outputs.plane_id }}",
+              "agent": "${{ steps.extract.outputs.agent }}",
+              "action": "${{ github.event.action }}",
+              "merged": ${{ github.event.pull_request.merged }}
+            }'
