@@ -1,0 +1,23 @@
+---
+description: Quilore project context — always loaded so every agent session knows the locked architecture before touching code.
+globs:
+alwaysApply: true
+---
+
+# Quilore Project Context
+
+Read `AGENTS.md` at the repo root before starting any task — it is the single source of truth for architecture, tech stack, conventions, and product rules. For full product/technical spec, see `docs/Quilore.md`.
+
+Hard constraints (repeated here so they load in every session even if you don't open AGENTS.md):
+- Spring Boot = stateful business logic and source of truth. FastAPI = stateless AI orchestration only. AI never writes to the database directly — output must pass through Spring Boot validation first.
+- On-device inference (Whisper.cpp, MediaPipe Pose) stays on-device.
+- Cloud AI calls route through FastAPI's fallback matrix (Groq → OpenRouter → Hugging Face → NVIDIA NIM), never called directly from the client.
+- All AI-derived output must stay user-editable; injury/muscle-map guidance is a risk flag, never a diagnosis.
+
+Git workflow (see `AGENTS.md` for full detail):
+- Work only on your tool's own branch (e.g. `cursor`). Fetch and pull `main` first; if your branch doesn't exist yet, branch it off latest `main`.
+- Never commit directly to `main` or `dev`. Open PRs from your branch into `dev` only, never into `main`.
+- Before opening a PR, add a What/Why/How entry to `docs/agent-log.md` and fill in `.github/pull_request_template.md`.
+- Reuse existing code/components before adding new ones. Don't over-engineer — smallest change that satisfies the task and the locked architecture/design system.
+
+Do not duplicate further project rules into this file — extend `AGENTS.md` instead, since Cursor rules and `AGENTS.md` can drift out of sync if edited separately.
