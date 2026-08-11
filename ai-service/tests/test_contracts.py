@@ -65,31 +65,34 @@ def test_route_all_task_types_return_contract():
         assert "message" in data
 
 
-def test_invoke_returns_normalized_editable_envelope():
+def test_invoke_returns_explicit_unavailable_deferred():
+    """B5 Path B: never fake successful inference; return 503 unavailable/deferred."""
     response = client.post(
         "/ai/tasks/chat/invoke",
         json={"input": {"prompt": "suggest a deload"}, "prefer_provider": None},
     )
-    assert response.status_code == 200
-    data = response.json()
+    assert response.status_code == 503
+    data = response.json()["detail"]
     assert REQUIRED_ENVELOPE_FIELDS <= set(data.keys())
-    # Product rule: AI output is never final / always editable.
     assert data["editable"] is True
     assert data["user_confirmation_required"] is True
     assert data["degraded"] is True
-    assert data["provider"] is None
     assert data["task"] == "chat"
-    # Validate against Pydantic contract explicitly
+    assert data["content"]["status"] == "unavailable"
+    assert data["content"]["reason"] == "deferred"
+    assert "accepted" not in data["content"]
     NormalizedAIResponse.model_validate(data)
 
 
-def test_invoke_all_task_types_normalize():
+def test_invoke_all_task_types_are_unavailable_deferred():
     for task in TaskType:
         response = client.post(f"/ai/tasks/{task.value}/invoke", json={"input": {}})
-        assert response.status_code == 200, task
-        data = response.json()
+        assert response.status_code == 503, task
+        data = response.json()["detail"]
         assert data["editable"] is True
         assert data["user_confirmation_required"] is True
+        assert data["degraded"] is True
+        assert data["content"]["status"] == "unavailable"
         assert data["task"] == task.value
         NormalizedAIResponse.model_validate(data)
 

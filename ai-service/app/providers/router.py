@@ -10,7 +10,7 @@ Implements the fallback matrix from docs/quilore_document_set.md §3.6:
 from enum import StrEnum
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
@@ -146,11 +146,10 @@ async def invoke_task(
     task_type: TaskType,
     body: InvokeRequest | None = None,
 ) -> NormalizedAIResponse:
-    """Invoke an AI task and return a normalized, always-editable envelope.
+    """Invoke an AI task — live provider adapters are deferred (B5 Path B).
 
-    Provider HTTP calls are not made here yet; this endpoint establishes the
-    contract Spring Boot and the client will consume. When no provider key is
-    configured, returns graceful degradation (§2.4) instead of an error.
+    Never returns a fake successful inference. Clients receive HTTP 503 with an
+    explicit unavailable/deferred envelope until real adapters are wired.
     """
     request = body or InvokeRequest()
     chain = FALLBACK_MATRIX.get(task_type, [])
@@ -160,30 +159,24 @@ async def invoke_task(
             selected = provider
             break
 
-    if selected is None:
-        return _normalize_result(
-            task_type,
-            provider=None,
-            chain=chain,
-            content=None,
-            message=(
-                "No providers configured for this task. "
-                "Your request was accepted; analysis will follow when a provider "
-                "becomes available."
-            ),
-            degraded=True,
-        )
-
-    # Placeholder success path: routing resolved, live inference lands later.
-    return _normalize_result(
+    envelope = _normalize_result(
         task_type,
         provider=selected,
         chain=chain,
         content={
-            "accepted": True,
+            "status": "unavailable",
+            "reason": "deferred",
             "input_keys": sorted(request.input.keys()),
-            "note": "Provider selected; inference adapter not yet wired.",
+            "selected_provider": selected,
+            "note": (
+                "Live inference adapters are not implemented. "
+                "This endpoint does not fabricate successful AI results."
+            ),
         },
-        message=f"Routed to {selected}; awaiting inference adapter.",
-        degraded=False,
+        message=(
+            "Live AI inference is deferred/unavailable. "
+            "No provider adapter call was made; do not treat this as a completed analysis."
+        ),
+        degraded=True,
     )
+    raise HTTPException(status_code=503, detail=envelope.model_dump())
