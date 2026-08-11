@@ -1,0 +1,12 @@
+# Maestro flow scaffold — run when a device/emulator is available:
+#   maestro test client/e2e/critical-tabs.yaml
+#
+# CI currently enforces the Jest journey contracts in client/__tests__.
+appId: host.exp.Exponent
+---
+- launchApp
+- assertVisible: "Workout"
+- tapOn: "Nutrition"
+- assertVisible: "Nutrition"
+- tapOn: "Chat"
+- assertVisible: "Chat"

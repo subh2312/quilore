@@ -90,10 +90,12 @@ docker compose up -d --build
 |---|---|---|---|---|
 | Backend (`/backend`) | JDK 21 + `./gradlew` wrapper | — | `./gradlew test` | `./gradlew bootRun` (or compose `backend`) |
 | AI service (`/ai-service`) | `pip install -r requirements.txt` | `ruff check .` | `pytest tests/ -v` | `uvicorn app.main:app --reload --port 8000` |
-| Client (`/client`) | `npm install` | `npx eslint . --max-warnings 0` | `npx tsc --noEmit` | `npx expo start` |
+| Client (`/client`) | `npm install` | `npx eslint . --max-warnings 0` | `npm test` (+ `npx tsc --noEmit`) | `npx expo start` |
 | Deploy tooling (`/deploy`) | — | — | `bash deploy/tests/test_promote_rollback.sh` | see `deploy/README.md` |
 
 CI/CD overview (Story 16.4): PR checks in `.github/workflows/ci.yml`; versioned GHCR publish in `publish-images.yml`; staging→production promotion in `promote.yml`; production rollback in `rollback.yml`. Details: `deploy/README.md`.
+
+Automated contracts (Story 16.3): backend MockMvc API contracts, AI gateway normalized envelope pytest contracts, client critical-journey Jest contracts (Maestro YAML under `client/e2e/` for device runs).
 
 ## PR / Commit Conventions
 

@@ -87,6 +87,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Journey / E2E contract tests
+        run: npm test
+
   # ─── Deploy tooling (promotion / rollback scripts) ───────
   deploy-tooling:
     name: Deploy Tooling Tests

@@ -14,6 +14,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.config import settings
+from app.providers.contracts import InvokeRequest, NormalizedAIResponse
 
 router = APIRouter()
 
@@ -113,4 +114,76 @@ async def route_task(task_type: TaskType) -> RouteResponse:
         fallback_chain=chain,
         message="No providers configured for this task. "
         "Results will be queued and processed when a provider becomes available.",
+    )
+
+
+def _normalize_result(
+    task_type: TaskType,
+    *,
+    provider: str | None,
+    chain: list[str],
+    content: Any | None,
+    message: str,
+    degraded: bool,
+) -> NormalizedAIResponse:
+    """Build the shared response envelope used by all invoke paths."""
+    fallback_used = bool(provider and chain and provider != chain[0])
+    return NormalizedAIResponse(
+        task=task_type.value,
+        provider=provider,
+        fallback_used=fallback_used,
+        degraded=degraded,
+        content=content,
+        confidence=None if degraded else 0.5,
+        message=message,
+        editable=True,
+        user_confirmation_required=True,
+    )
+
+
+@router.post("/tasks/{task_type}/invoke", response_model=NormalizedAIResponse)
+async def invoke_task(
+    task_type: TaskType,
+    body: InvokeRequest | None = None,
+) -> NormalizedAIResponse:
+    """Invoke an AI task and return a normalized, always-editable envelope.
+
+    Provider HTTP calls are not made here yet; this endpoint establishes the
+    contract Spring Boot and the client will consume. When no provider key is
+    configured, returns graceful degradation (§2.4) instead of an error.
+    """
+    request = body or InvokeRequest()
+    chain = FALLBACK_MATRIX.get(task_type, [])
+    selected = None
+    for provider in chain:
+        if _provider_available(provider):
+            selected = provider
+            break
+
+    if selected is None:
+        return _normalize_result(
+            task_type,
+            provider=None,
+            chain=chain,
+            content=None,
+            message=(
+                "No providers configured for this task. "
+                "Your request was accepted; analysis will follow when a provider "
+                "becomes available."
+            ),
+            degraded=True,
+        )
+
+    # Placeholder success path: routing resolved, live inference lands later.
+    return _normalize_result(
+        task_type,
+        provider=selected,
+        chain=chain,
+        content={
+            "accepted": True,
+            "input_keys": sorted(request.input.keys()),
+            "note": "Provider selected; inference adapter not yet wired.",
+        },
+        message=f"Routed to {selected}; awaiting inference adapter.",
+        degraded=False,
     )
