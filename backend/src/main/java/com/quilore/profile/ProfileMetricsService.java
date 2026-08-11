@@ -2,15 +2,13 @@ package com.quilore.profile;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class ProfileMetricsService {
@@ -29,7 +27,7 @@ public class ProfileMetricsService {
             String injuriesInfo,
             String equipmentAccess,
             String injuriesDisclaimer,
-            Instant updatedAt
+            java.time.Instant updatedAt
     ) {}
 
     public record BodyMetric(UUID id, UUID userId, LocalDate recordedOn, Double weightKg, Double waistCm,
@@ -38,66 +36,99 @@ public class ProfileMetricsService {
     public record CheckIn(UUID id, UUID userId, LocalDate recordedOn, Integer mood, Integer recovery,
                           Integer hunger, Integer energy, String notes) {}
 
-    private final Map<UUID, Profile> profiles = new ConcurrentHashMap<>();
-    private final Map<UUID, List<BodyMetric>> metrics = new ConcurrentHashMap<>();
-    private final Map<UUID, List<CheckIn>> checkIns = new ConcurrentHashMap<>();
+    private final UserProfileRepository profileRepository;
+    private final BodyMetricRepository bodyMetricRepository;
+    private final CheckInRepository checkInRepository;
 
+    public ProfileMetricsService(
+            UserProfileRepository profileRepository,
+            BodyMetricRepository bodyMetricRepository,
+            CheckInRepository checkInRepository
+    ) {
+        this.profileRepository = profileRepository;
+        this.bodyMetricRepository = bodyMetricRepository;
+        this.checkInRepository = checkInRepository;
+    }
+
+    @Transactional
     public Profile upsertProfile(UUID userId, Map<String, Object> body) {
         require(body, "age", "sex", "heightCm", "weightKg");
-        Profile profile = new Profile(
-                userId,
-                ((Number) body.get("age")).intValue(),
-                String.valueOf(body.get("sex")),
-                ((Number) body.get("heightCm")).doubleValue(),
-                ((Number) body.get("weightKg")).doubleValue(),
-                String.valueOf(body.getOrDefault("trainingExperience", "")),
-                String.valueOf(body.getOrDefault("dietaryPreferences", "")),
-                String.valueOf(body.getOrDefault("injuriesInfo", "")),
-                String.valueOf(body.getOrDefault("equipmentAccess", "")),
-                INJURY_DISCLAIMER,
-                Instant.now()
-        );
-        profiles.put(userId, profile);
-        return profile;
+        UserProfileEntity entity = profileRepository.findById(userId).orElseGet(UserProfileEntity::new);
+        entity.setUserId(userId);
+        entity.setAge(((Number) body.get("age")).intValue());
+        entity.setSex(String.valueOf(body.get("sex")));
+        entity.setHeightCm(((Number) body.get("heightCm")).doubleValue());
+        entity.setWeightKg(((Number) body.get("weightKg")).doubleValue());
+        entity.setTrainingExperience(String.valueOf(body.getOrDefault("trainingExperience", "")));
+        entity.setDietaryPreferences(String.valueOf(body.getOrDefault("dietaryPreferences", "")));
+        entity.setInjuriesInfo(String.valueOf(body.getOrDefault("injuriesInfo", "")));
+        entity.setEquipmentAccess(String.valueOf(body.getOrDefault("equipmentAccess", "")));
+        entity.setInjuriesDisclaimer(INJURY_DISCLAIMER);
+        return toProfile(profileRepository.save(entity));
     }
 
+    @Transactional(readOnly = true)
     public Profile getProfile(UUID userId) {
-        Profile profile = profiles.get(userId);
-        if (profile == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
-        }
-        return profile;
+        return profileRepository.findById(userId)
+                .map(this::toProfile)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found"));
     }
 
+    @Transactional
     public BodyMetric logMetric(UUID userId, LocalDate date, Double weightKg, Double waistCm, String photoKey) {
-        BodyMetric metric = new BodyMetric(UUID.randomUUID(), userId, date, weightKg, waistCm, photoKey);
-        metrics.compute(userId, (k, list) -> {
-            List<BodyMetric> out = list == null ? new ArrayList<>() : new ArrayList<>(list);
-            out.add(metric);
-            return out;
-        });
-        return metric;
+        BodyMetricEntity entity = new BodyMetricEntity();
+        entity.setUserId(userId);
+        entity.setRecordedOn(date);
+        entity.setWeightKg(weightKg);
+        entity.setWaistCm(waistCm);
+        entity.setPhotoObjectKey(photoKey);
+        BodyMetricEntity saved = bodyMetricRepository.save(entity);
+        return new BodyMetric(saved.getId(), saved.getUserId(), saved.getRecordedOn(),
+                saved.getWeightKg(), saved.getWaistCm(), saved.getPhotoObjectKey());
     }
 
+    @Transactional
     public CheckIn logCheckIn(UUID userId, LocalDate date, Integer mood, Integer recovery,
                               Integer hunger, Integer energy, String notes) {
         validateMarker(mood);
         validateMarker(recovery);
         validateMarker(hunger);
         validateMarker(energy);
-        CheckIn checkIn = new CheckIn(UUID.randomUUID(), userId, date, mood, recovery, hunger, energy, notes);
-        checkIns.compute(userId, (k, list) -> {
-            List<CheckIn> out = list == null ? new ArrayList<>() : new ArrayList<>(list);
-            out.add(checkIn);
-            return out;
-        });
-        return checkIn;
+        CheckInEntity entity = new CheckInEntity();
+        entity.setUserId(userId);
+        entity.setRecordedOn(date);
+        entity.setMood(mood);
+        entity.setRecovery(recovery);
+        entity.setHunger(hunger);
+        entity.setEnergy(energy);
+        entity.setNotes(notes);
+        CheckInEntity saved = checkInRepository.save(entity);
+        return new CheckIn(saved.getId(), saved.getUserId(), saved.getRecordedOn(), saved.getMood(),
+                saved.getRecovery(), saved.getHunger(), saved.getEnergy(), saved.getNotes());
     }
 
+    @Transactional(readOnly = true)
     public List<BodyMetric> metricsBetween(UUID userId, LocalDate from, LocalDate to) {
-        return metrics.getOrDefault(userId, List.of()).stream()
-                .filter(m -> !m.recordedOn().isBefore(from) && !m.recordedOn().isAfter(to))
+        return bodyMetricRepository.findByUserIdAndRecordedOnBetweenOrderByRecordedOnAsc(userId, from, to).stream()
+                .map(m -> new BodyMetric(m.getId(), m.getUserId(), m.getRecordedOn(),
+                        m.getWeightKg(), m.getWaistCm(), m.getPhotoObjectKey()))
                 .toList();
+    }
+
+    private Profile toProfile(UserProfileEntity entity) {
+        return new Profile(
+                entity.getUserId(),
+                entity.getAge(),
+                entity.getSex(),
+                entity.getHeightCm(),
+                entity.getWeightKg(),
+                entity.getTrainingExperience(),
+                entity.getDietaryPreferences(),
+                entity.getInjuriesInfo(),
+                entity.getEquipmentAccess(),
+                entity.getInjuriesDisclaimer(),
+                entity.getUpdatedAt()
+        );
     }
 
     private static void require(Map<String, Object> body, String... keys) {

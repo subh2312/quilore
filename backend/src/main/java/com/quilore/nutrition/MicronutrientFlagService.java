@@ -1,6 +1,7 @@
 package com.quilore.nutrition;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -8,7 +9,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class MicronutrientFlagService {
@@ -18,12 +18,17 @@ public class MicronutrientFlagService {
                        Instant createdAt, boolean dismissed) {}
 
     private final ThresholdConfig thresholds = new ThresholdConfig("micro-flags-v1", 0.8, 3, 2);
-    private final Map<UUID, List<Flag>> flags = new ConcurrentHashMap<>();
+    private final MicronutrientFlagRepository flagRepository;
+
+    public MicronutrientFlagService(MicronutrientFlagRepository flagRepository) {
+        this.flagRepository = flagRepository;
+    }
 
     public ThresholdConfig thresholds() {
         return thresholds;
     }
 
+    @Transactional
     public List<Flag> evaluate(UUID userId, Map<String, Double> targets, List<Map<String, Double>> dailyIntake) {
         List<Flag> created = new ArrayList<>();
         for (Map.Entry<String, Double> target : targets.entrySet()) {
@@ -33,49 +38,33 @@ public class MicronutrientFlagService {
                     .filter(v -> v < target.getValue() * thresholds.underFraction())
                     .count();
             if (breaches >= thresholds.minBreaches()) {
-                Flag flag = new Flag(
-                        UUID.randomUUID(),
-                        userId,
-                        nutrient,
-                        thresholds.windowDays() + "d",
-                        "Repeated shortfall in " + nutrient.replace('_', ' ')
-                                + " over the last " + thresholds.windowDays() + " days.",
-                        Instant.now(),
-                        false
-                );
-                flags.compute(userId, (k, list) -> {
-                    List<Flag> out = list == null ? new ArrayList<>() : new ArrayList<>(list);
-                    out.add(flag);
-                    return out;
-                });
-                created.add(flag);
+                MicronutrientFlagEntity entity = new MicronutrientFlagEntity();
+                entity.setUserId(userId);
+                entity.setNutrient(nutrient);
+                entity.setWindowLabel(thresholds.windowDays() + "d");
+                entity.setMessage("Repeated shortfall in " + nutrient.replace('_', ' ')
+                        + " over the last " + thresholds.windowDays() + " days.");
+                entity.setCreatedAt(Instant.now());
+                entity.setDismissed(false);
+                created.add(toFlag(flagRepository.save(entity)));
             }
         }
         return created;
     }
 
+    @Transactional(readOnly = true)
     public List<Flag> active(UUID userId) {
-        return flags.getOrDefault(userId, List.of()).stream().filter(f -> !f.dismissed()).toList();
+        return flagRepository.findByUserIdAndDismissedFalseOrderByCreatedAtDesc(userId).stream()
+                .map(this::toFlag)
+                .toList();
     }
 
+    @Transactional
     public Flag dismiss(UUID userId, UUID flagId) {
-        List<Flag> list = flags.getOrDefault(userId, List.of());
-        List<Flag> updated = new ArrayList<>();
-        Flag found = null;
-        for (Flag flag : list) {
-            if (flag.id().equals(flagId)) {
-                found = new Flag(flag.id(), flag.userId(), flag.nutrient(), flag.window(),
-                        flag.message(), flag.createdAt(), true);
-                updated.add(found);
-            } else {
-                updated.add(flag);
-            }
-        }
-        if (found == null) {
-            throw new IllegalArgumentException("Flag not found");
-        }
-        flags.put(userId, updated);
-        return found;
+        MicronutrientFlagEntity entity = flagRepository.findByIdAndUserId(flagId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Flag not found"));
+        entity.setDismissed(true);
+        return toFlag(flagRepository.save(entity));
     }
 
     public String coachingCallout(String nutrient) {
@@ -87,5 +76,17 @@ public class MicronutrientFlagService {
             return "Spread protein across meals; this is a coaching flag, not a diagnosis.";
         }
         return "Review recent intake for " + nutrient + "; editable coaching suggestion.";
+    }
+
+    private Flag toFlag(MicronutrientFlagEntity entity) {
+        return new Flag(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getNutrient(),
+                entity.getWindowLabel(),
+                entity.getMessage(),
+                entity.getCreatedAt(),
+                entity.isDismissed()
+        );
     }
 }

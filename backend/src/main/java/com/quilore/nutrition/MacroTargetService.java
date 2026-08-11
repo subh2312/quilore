@@ -1,14 +1,13 @@
 package com.quilore.nutrition;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class MacroTargetService {
@@ -39,8 +38,13 @@ public class MacroTargetService {
             "surplus", new Policy("surplus", 0.10, 1.8, 0.25, "macro-policy-v1")
     );
 
-    private final Map<UUID, List<TargetSnapshot>> history = new ConcurrentHashMap<>();
+    private final MacroTargetSnapshotRepository snapshotRepository;
 
+    public MacroTargetService(MacroTargetSnapshotRepository snapshotRepository) {
+        this.snapshotRepository = snapshotRepository;
+    }
+
+    @Transactional
     public TargetSnapshot calculate(UUID userId, String goalType, double weightKg, double heightCm,
                                     int age, String sex, String activityLevel) {
         Policy policy = policies.getOrDefault(goalType, policies.get("maintain"));
@@ -50,25 +54,52 @@ public class MacroTargetService {
         double protein = weightKg * policy.proteinPerKg();
         double fat = (calories * policy.fatFraction()) / 9.0;
         double carbs = Math.max(0, (calories - (protein * 4.0) - (fat * 9.0)) / 4.0);
-        TargetSnapshot snapshot = new TargetSnapshot(
-                UUID.randomUUID(), userId, policy.goalType(), weightKg, heightCm, age, sex,
-                activityLevel, calories, round1(protein), round1(fat), round1(carbs),
-                policy.version(), Instant.now()
-        );
-        history.compute(userId, (k, list) -> {
-            List<TargetSnapshot> out = list == null ? new ArrayList<>() : new ArrayList<>(list);
-            out.add(snapshot);
-            return out;
-        });
-        return snapshot;
+
+        MacroTargetSnapshotEntity entity = new MacroTargetSnapshotEntity();
+        entity.setUserId(userId);
+        entity.setGoalType(policy.goalType());
+        entity.setWeightKg(weightKg);
+        entity.setHeightCm(heightCm);
+        entity.setAge(age);
+        entity.setSex(sex);
+        entity.setActivityLevel(activityLevel);
+        entity.setTargetCalories(calories);
+        entity.setTargetProteinG(round1(protein));
+        entity.setTargetFatG(round1(fat));
+        entity.setTargetCarbsG(round1(carbs));
+        entity.setPolicyVersion(policy.version());
+        entity.setEffectiveFrom(Instant.now());
+        return toSnapshot(snapshotRepository.save(entity));
     }
 
+    @Transactional(readOnly = true)
     public List<TargetSnapshot> history(UUID userId) {
-        return List.copyOf(history.getOrDefault(userId, List.of()));
+        return snapshotRepository.findByUserIdOrderByEffectiveFromAsc(userId).stream()
+                .map(this::toSnapshot)
+                .toList();
     }
 
     public Map<String, Policy> policies() {
         return policies;
+    }
+
+    private TargetSnapshot toSnapshot(MacroTargetSnapshotEntity entity) {
+        return new TargetSnapshot(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getGoalType(),
+                entity.getWeightKg(),
+                entity.getHeightCm(),
+                entity.getAge(),
+                entity.getSex(),
+                entity.getActivityLevel(),
+                entity.getTargetCalories(),
+                entity.getTargetProteinG(),
+                entity.getTargetFatG(),
+                entity.getTargetCarbsG(),
+                entity.getPolicyVersion(),
+                entity.getEffectiveFrom()
+        );
     }
 
     private static double mifflin(double weightKg, double heightCm, int age, String sex) {

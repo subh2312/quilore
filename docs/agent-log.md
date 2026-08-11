@@ -4,9 +4,34 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Completed B3 — replaced ConcurrentHashMap production domain state with PostgreSQL JPA repositories.
+- **Why:** Merge blocker B3: profiles, quotas, sync, notifications, media metadata, etc. must survive restart.
+- **How:** Entities/repos for V2–V4 tables + V6 sync/macro/micro/meal-log/media status; MinIO metadata deferred; PersistenceRestartIntegrationTest; `./gradlew test` PASS.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Completed B2 — object-level authorization from authenticated principal; media ownership ignores client userId.
+- **Why:** Merge blocker B2: users must not access/mutate another user's data via path/body userId.
+- **How:** CurrentUser.requireSelfOrAdmin on owned routes; admin plan assign audited; ObjectLevelAuthorizationTest.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Starting B3/B4/B6 — PostgreSQL persistence, secure encryption, real Postgres+pgvector migration proof.
+- **Why:** Merge blockers for durable state, encryption fail-closed, and live migration evidence.
+- **How:** JPA repositories for critical domains; FieldEncryptor fail-closed; Flyway against Postgres+pgvector (+ Testcontainers when Docker available).
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Completed B1 — JWT bearer auth wired into Spring Security with JPA users/refresh sessions and executable bearer-token tests.
 - **Why:** Merge blocker B1: issued JWTs must establish SecurityContext principal/roles.
 - **How:** oauth2-resource-server JwtDecoder/Encoder (iss/aud/exp/HS256); hashed refresh_sessions; fail-closed secret validator; JwtBearerAuthIntegrationTest.
+
 
 - **Date:** 2026-08-11
 - **Tool:** cursor

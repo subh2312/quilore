@@ -9,6 +9,9 @@ spring:
     hibernate:
       ddl-auto: create-drop
     database-platform: org.hibernate.dialect.H2Dialect
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
 
   flyway:
     enabled: false
@@ -21,6 +24,9 @@ quilore:
     # 32 zero bytes — allowed only because allow-insecure-defaults is true in tests
     data-encryption-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     allow-insecure-defaults: true
+
+minio:
+  enabled: false
 
 management:
   endpoints:

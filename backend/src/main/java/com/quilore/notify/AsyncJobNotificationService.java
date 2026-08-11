@@ -2,14 +2,12 @@ package com.quilore.notify;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AsyncJobNotificationService {
@@ -22,19 +20,30 @@ public class AsyncJobNotificationService {
     public record Notification(UUID id, UUID userId, String title, String body, String deepLink,
                                boolean privacySafe, String deliveryStatus, Instant createdAt) {}
 
-    private final Map<UUID, AiJob> jobs = new ConcurrentHashMap<>();
-    private final Map<UUID, Notification> notifications = new ConcurrentHashMap<>();
+    private final AiJobRepository jobRepository;
+    private final NotificationRepository notificationRepository;
 
-    public AiJob enqueue(UUID userId, String jobType, String deepLink) {
-        AiJob job = new AiJob(UUID.randomUUID(), userId, jobType, JobStatus.QUEUED, null, null, deepLink, Instant.now());
-        jobs.put(job.id(), job);
-        return job;
+    public AsyncJobNotificationService(AiJobRepository jobRepository, NotificationRepository notificationRepository) {
+        this.jobRepository = jobRepository;
+        this.notificationRepository = notificationRepository;
     }
 
+    @Transactional
+    public AiJob enqueue(UUID userId, String jobType, String deepLink) {
+        AiJobEntity entity = new AiJobEntity();
+        entity.setUserId(userId);
+        entity.setJobType(jobType);
+        entity.setStatus(JobStatus.QUEUED.name());
+        entity.setDeepLink(deepLink);
+        return toJob(jobRepository.save(entity));
+    }
+
+    @Transactional
     public AiJob markRunning(UUID jobId) {
         return update(jobId, JobStatus.RUNNING, null, null);
     }
 
+    @Transactional
     public AiJob complete(UUID jobId, String resultRef) {
         AiJob job = update(jobId, JobStatus.COMPLETED, resultRef, null);
         notifyUser(job.userId(), "Analysis ready", "Your " + job.jobType() + " result is ready.",
@@ -42,6 +51,7 @@ public class AsyncJobNotificationService {
         return job;
     }
 
+    @Transactional
     public AiJob fail(UUID jobId, String error) {
         AiJob job = update(jobId, JobStatus.FAILED, null, error);
         notifyUser(job.userId(), "Analysis failed", "Tap to retry your " + job.jobType() + ".",
@@ -49,40 +59,86 @@ public class AsyncJobNotificationService {
         return job;
     }
 
+    @Transactional(readOnly = true)
     public AiJob get(UUID jobId) {
-        AiJob job = jobs.get(jobId);
-        if (job == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found");
-        }
-        return job;
+        return jobRepository.findById(jobId)
+                .map(this::toJob)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
     }
 
+    @Transactional(readOnly = true)
     public List<Notification> forUser(UUID userId) {
-        return notifications.values().stream().filter(n -> n.userId().equals(userId)).toList();
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(this::toNotification)
+                .toList();
     }
 
     private AiJob update(UUID jobId, JobStatus status, String resultRef, String error) {
-        AiJob prev = get(jobId);
-        AiJob next = new AiJob(prev.id(), prev.userId(), prev.jobType(), status,
-                resultRef != null ? resultRef : prev.resultRef(),
-                error != null ? error : prev.errorMessage(),
-                prev.deepLink(), Instant.now());
-        jobs.put(jobId, next);
-        return next;
+        AiJobEntity entity = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        entity.setStatus(status.name());
+        if (resultRef != null) {
+            entity.setResultRef(resultRef);
+        }
+        if (error != null) {
+            entity.setErrorMessage(error);
+        }
+        entity.setUpdatedAt(Instant.now());
+        return toJob(jobRepository.save(entity));
     }
 
     private void notifyUser(UUID userId, String title, String body, String deepLink, boolean privacySafe) {
-        Notification n = new Notification(UUID.randomUUID(), userId, title, body, deepLink,
-                privacySafe, "SENT", Instant.now());
-        notifications.put(n.id(), n);
+        NotificationEntity entity = new NotificationEntity();
+        entity.setUserId(userId);
+        entity.setTitle(title);
+        entity.setBody(body);
+        entity.setDeepLink(deepLink);
+        entity.setPrivacySafe(privacySafe);
+        entity.setDeliveryStatus("SENT");
+        notificationRepository.save(entity);
     }
 
-    // Package-visible for meal reminder service reuse
+    @Transactional
     void publish(Notification notification) {
-        notifications.put(notification.id(), notification);
+        NotificationEntity entity = new NotificationEntity();
+        entity.setId(notification.id());
+        entity.setUserId(notification.userId());
+        entity.setTitle(notification.title());
+        entity.setBody(notification.body());
+        entity.setDeepLink(notification.deepLink());
+        entity.setPrivacySafe(notification.privacySafe());
+        entity.setDeliveryStatus(notification.deliveryStatus());
+        notificationRepository.save(entity);
     }
 
+    @Transactional(readOnly = true)
     List<Notification> all() {
-        return new ArrayList<>(notifications.values());
+        return notificationRepository.findAll().stream().map(this::toNotification).toList();
+    }
+
+    private AiJob toJob(AiJobEntity entity) {
+        return new AiJob(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getJobType(),
+                JobStatus.valueOf(entity.getStatus()),
+                entity.getResultRef(),
+                entity.getErrorMessage(),
+                entity.getDeepLink(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    private Notification toNotification(NotificationEntity entity) {
+        return new Notification(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getTitle(),
+                entity.getBody(),
+                entity.getDeepLink(),
+                entity.isPrivacySafe(),
+                entity.getDeliveryStatus(),
+                entity.getCreatedAt()
+        );
     }
 }

@@ -2,86 +2,100 @@ package com.quilore.prompt;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class PromptTemplateService {
 
-    private final Map<String, List<PromptVersion>> versions = new ConcurrentHashMap<>();
-    private final Map<String, Integer> active = new ConcurrentHashMap<>();
-    private final List<Map<String, Object>> audit = new ArrayList<>();
-
     public record PromptVersion(String key, int version, String modelHint, String body, String createdBy, Instant createdAt) {}
 
+    private final PromptTemplateRepository repository;
+
+    public PromptTemplateService(PromptTemplateRepository repository) {
+        this.repository = repository;
+    }
+
+    @Transactional
     public PromptVersion create(String key, String body, String modelHint, String actor) {
-        AtomicInteger next = new AtomicInteger(1);
-        versions.compute(key, (k, list) -> {
-            List<PromptVersion> out = list == null ? new ArrayList<>() : new ArrayList<>(list);
-            int ver = out.stream().mapToInt(PromptVersion::version).max().orElse(0) + 1;
-            next.set(ver);
-            out.add(new PromptVersion(key, ver, modelHint == null ? "default" : modelHint, body, actor, Instant.now()));
-            return out;
-        });
-        recordAudit(actor, "CREATE", key, next.get());
-        return get(key, next.get());
+        int nextVersion = repository.findTopByKeyOrderByVersionDesc(key)
+                .map(e -> e.getVersion() + 1)
+                .orElse(1);
+        PromptTemplateEntity entity = new PromptTemplateEntity();
+        entity.setKey(key);
+        entity.setVersion(nextVersion);
+        entity.setModelHint(modelHint == null ? "default" : modelHint);
+        entity.setBody(body);
+        entity.setActive(false);
+        entity.setCreatedBy(actor);
+        return toVersion(repository.save(entity));
     }
 
+    @Transactional
     public PromptVersion activate(String key, int version, String actor) {
-        PromptVersion target = get(key, version);
-        active.put(key, version);
-        recordAudit(actor, "ACTIVATE", key, version);
-        return target;
+        PromptTemplateEntity target = repository.findByKeyAndVersion(key, version)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Prompt version not found"));
+        for (PromptTemplateEntity entity : repository.findByKeyOrderByVersionAsc(key)) {
+            entity.setActive(entity.getVersion() == version);
+        }
+        return toVersion(target);
     }
 
+    @Transactional
     public PromptVersion rollback(String key, int version, String actor) {
         return activate(key, version, actor + " (rollback)");
     }
 
+    @Transactional(readOnly = true)
     public PromptVersion getActive(String key) {
-        Integer ver = active.get(key);
-        if (ver == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No active prompt");
-        }
-        return get(key, ver);
+        return repository.findByKeyAndActiveTrue(key)
+                .map(this::toVersion)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No active prompt"));
     }
 
+    @Transactional(readOnly = true)
     public List<PromptVersion> history(String key) {
-        return versions.getOrDefault(key, List.of()).stream()
-                .sorted(Comparator.comparingInt(PromptVersion::version))
-                .toList();
+        return repository.findByKeyOrderByVersionAsc(key).stream().map(this::toVersion).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> auditTrail() {
-        synchronized (audit) {
-            return List.copyOf(audit);
+        List<Map<String, Object>> audit = new ArrayList<>();
+        for (PromptTemplateEntity entity : repository.findAllByOrderByCreatedAtAsc()) {
+            Map<String, Object> create = new LinkedHashMap<>();
+            create.put("actor", entity.getCreatedBy());
+            create.put("action", "CREATE");
+            create.put("key", entity.getKey());
+            create.put("version", entity.getVersion());
+            create.put("at", entity.getCreatedAt().toString());
+            audit.add(create);
+            if (entity.isActive()) {
+                Map<String, Object> activate = new LinkedHashMap<>();
+                activate.put("actor", entity.getCreatedBy());
+                activate.put("action", "ACTIVATE");
+                activate.put("key", entity.getKey());
+                activate.put("version", entity.getVersion());
+                activate.put("at", entity.getCreatedAt().toString());
+                audit.add(activate);
+            }
         }
+        return audit;
     }
 
-    private PromptVersion get(String key, int version) {
-        return versions.getOrDefault(key, List.of()).stream()
-                .filter(v -> v.version() == version && Objects.equals(v.key(), key))
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Prompt version not found"));
-    }
-
-    private void recordAudit(String actor, String action, String key, int version) {
-        synchronized (audit) {
-            audit.add(Map.of(
-                    "actor", actor,
-                    "action", action,
-                    "key", key,
-                    "version", version,
-                    "at", Instant.now().toString()
-            ));
-        }
+    private PromptVersion toVersion(PromptTemplateEntity entity) {
+        return new PromptVersion(
+                entity.getKey(),
+                entity.getVersion(),
+                entity.getModelHint(),
+                entity.getBody(),
+                entity.getCreatedBy(),
+                entity.getCreatedAt()
+        );
     }
 }

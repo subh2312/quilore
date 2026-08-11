@@ -11,7 +11,7 @@
 |---|---|---|---|
 | B1 | Blocker | DONE | OAuth2 resource-server JWT; JPA users+refresh_sessions; JwtBearerAuthIntegrationTest |
 | B2 | Blocker | DONE | CurrentUser.requireSelfOrAdmin on owned routes; ObjectLevelAuthorizationTest |
-| B3 | Blocker | TODO | Replace ConcurrentHashMap production state with PostgreSQL |
+| B3 | Blocker | DONE | JPA repos for profiles/entitlements/sync/jobs/media/etc.; V6; PersistenceRestartIntegrationTest |
 | B4 | Blocker | TODO | Remove all-zero AES fallback outside tests; fail closed in staging/prod |
 | B5 | Blocker | TODO | AI invoke must not fake success — adapters or explicit unavailable |
 | B6 | Blocker | TODO | Prove Flyway on real Postgres+pgvector (Testcontainers) |
@@ -59,6 +59,18 @@
 |---|---|---|
 | 2026-08-11 | Phase 0 | Tracker created; classification corrected |
 | 2026-08-11 | B1 | `./gradlew test --tests com.quilore.auth.JwtBearerAuthIntegrationTest` PASS; USER/ADMIN/missing/tampered/expired/iss/aud + refresh rotation |
+| 2026-08-11 | B2 | `./gradlew test --tests com.quilore.security.ObjectLevelAuthorizationTest` PASS; cross-user 403 for profile/quota/sync/media/notifications |
+| 2026-08-11 | B3 | `./gradlew test` PASS; ConcurrentHashMap domain stores → JPA; V6 sync/macro/micro/meal-log/media status; MinIO metadata deferred (`minio.enabled=false`); PersistenceRestartIntegrationTest |
+
+## B3 notes
+
+- Replaced in-memory ConcurrentHashMap/list stores with Spring Data JPA entities/repositories for: profiles/metrics/check-ins, plans/entitlements/quotas, sync records/mutations/last-sync, AI jobs/notifications, meal reminder prefs (+ `last_meal_log_at`), permission_audit, macro_target_snapshots, micronutrient_flags, prompt_templates, exercises/exercise_revisions, media_objects.
+- Flyway `V6__domain_persistence.sql` adds sync_*, macro_target_snapshots, micronutrient_flags, meal last-log column, permission_audit.actor_label, media_objects.status.
+- Public service method signatures / record DTOs preserved; services use `@Transactional`.
+- H2 tests: Flyway disabled, `ddl-auto: create-drop`, quoted identifiers; entities avoid Postgres-only columnDefinition TEXT.
+- MinIO: `minio.enabled` defaults false; register persists metadata with `status: deferred` (no fake successful private upload). Live SDK upload left for a follow-up when enabled.
+- Evidence: `PersistenceRestartIntegrationTest` writes profile/quota/sync/notification/media, clears persistence context, reloads (same Spring context = restart simulation).
+- Auth rate-limit ConcurrentHashMap retained (allowed).
 
 ## Blockers / follow-ups
 

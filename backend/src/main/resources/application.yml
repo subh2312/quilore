@@ -72,6 +72,7 @@ quilore:
     allow-insecure-defaults: ${QUILORE_ALLOW_INSECURE_DEFAULTS:false}
 
 minio:
+  enabled: ${MINIO_ENABLED:false}
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
   bucket: ${MINIO_BUCKET:quilore-media}
   access-key: ${MINIO_ROOT_USER:quilore_minio}
