@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Fixed CI Deploy Tooling failure in secret rotation workspace-path guard.
+- **Why:** Guard only matched `/workspace`, so GitHub Actions (`/home/runner/work/...`) incorrectly allowed writing secrets into the checkout.
+- **How:** Resolve repo root from the script location and refuse any `--out` path under that tree.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Implemented nutrition engines (IFCT resolve, macros/micros/RDA, shortfall flags, manual meal calc, training insights), pose/ego-lift kinematics, exercise mapping, hybrid RAG search, pull-push sync, and MinIO/pgvector schema.
 - **Why:** Remaining ordered Plane backlog stories spanning nutrition, form-check, sync, and infra data plane. Plane MCP unavailable; criteria from `docs/quilore-plane-backlog.md`.
 - **How:** Spring Boot nutrition/sync/media services with tests; FastAPI pose/exercise/RAG modules with pytest; Flyway V4 for `rag_chunks` + `media_objects`.

@@ -30,10 +30,23 @@ if [[ -z "$MODE" ]]; then
   exit 2
 fi
 
-if [[ "$OUT" == *"/workspace/"* ]] || [[ "$OUT" == /workspace* ]]; then
-  echo "error: refusing to write secrets inside the git workspace: $OUT" >&2
-  exit 2
+# Never write secrets into the git checkout (path differs on CI runners vs local /workspace).
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Resolve to absolute when possible; fall back to string prefix checks.
+if command -v realpath >/dev/null 2>&1; then
+  OUT_ABS="$(realpath -m -- "$OUT" 2>/dev/null || echo "$OUT")"
+else
+  case "$OUT" in
+    /*) OUT_ABS="$OUT" ;;
+    *) OUT_ABS="$(pwd)/$OUT" ;;
+  esac
 fi
+case "$OUT_ABS" in
+  "$REPO_ROOT"|"$REPO_ROOT"/*)
+    echo "error: refusing to write secrets inside the git workspace: $OUT_ABS" >&2
+    exit 2
+    ;;
+esac
 
 jwt_secret() {
   openssl rand -base64 48 | tr -d '\n'
