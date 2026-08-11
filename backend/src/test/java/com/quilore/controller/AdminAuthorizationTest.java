@@ -1,5 +1,6 @@
 package com.quilore.controller;
 
+import com.quilore.auth.AuthService;
 import com.quilore.security.Permission;
 import com.quilore.security.PermissionAuditService;
 import com.quilore.security.UserRole;
@@ -11,6 +12,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -27,6 +30,9 @@ class AdminAuthorizationTest {
 
     @Autowired
     private PermissionAuditService permissionAuditService;
+
+    @Autowired
+    private AuthService authService;
 
     @BeforeEach
     void clearAudit() {
@@ -61,11 +67,12 @@ class AdminAuthorizationTest {
     }
 
     @Test
-    @WithMockUser(username = "ops", roles = "ADMIN")
+    @WithMockUser(username = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", roles = "ADMIN")
     void roleChangesAreAuditable() throws Exception {
+        var target = authService.register("role-target-" + UUID.randomUUID() + "@quilore.test", "password123", "T");
         mockMvc.perform(post("/api/admin/roles")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"u-1\",\"role\":\"SUPPORT\"}"))
+                        .content("{\"userId\":\"" + target.id() + "\",\"role\":\"SUPPORT\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accepted").value(true));
 
@@ -73,7 +80,7 @@ class AdminAuthorizationTest {
         assertThat(permissionAuditService.recentEvents().getLast().get("action"))
                 .isEqualTo("CHANGE_ROLE");
         assertThat(permissionAuditService.recentEvents().getLast().get("actor"))
-                .isEqualTo("ops");
+                .isEqualTo("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     }
 
     @Test

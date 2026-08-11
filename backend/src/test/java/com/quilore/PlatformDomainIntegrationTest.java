@@ -78,9 +78,9 @@ class PlatformDomainIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER")
+    @WithMockUser(username = "11111111-1111-1111-1111-111111111111", roles = "USER")
     void profileRequiresBaselineFieldsAndLabelsInjuries() throws Exception {
-        UUID userId = UUID.randomUUID();
+        UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
         mockMvc.perform(put("/api/profiles/" + userId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"age\":28}"))

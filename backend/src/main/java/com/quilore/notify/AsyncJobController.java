@@ -1,5 +1,6 @@
 package com.quilore.notify;
 
+import com.quilore.security.CurrentUser;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,8 +24,14 @@ public class AsyncJobController {
 
     @PostMapping("/ai-jobs")
     public ResponseEntity<?> enqueue(@RequestBody Map<String, String> body) {
+        UUID owner = CurrentUser.requireUserId();
+        // Ignore client-supplied userId for non-admin callers (B2).
+        if (body.containsKey("userId") && body.get("userId") != null && !body.get("userId").isBlank()
+                && CurrentUser.hasRole("ADMIN")) {
+            owner = UUID.fromString(body.get("userId"));
+        }
         var job = service.enqueue(
-                UUID.fromString(body.get("userId")),
+                owner,
                 body.get("jobType"),
                 body.getOrDefault("deepLink", "/progress")
         );
@@ -33,27 +40,31 @@ public class AsyncJobController {
 
     @PostMapping("/ai-jobs/{id}/running")
     public ResponseEntity<?> running(@PathVariable UUID id) {
+        requireOwnedJob(id);
         return ResponseEntity.ok(toMap(service.markRunning(id)));
     }
 
     @PostMapping("/ai-jobs/{id}/complete")
     public ResponseEntity<?> complete(@PathVariable UUID id, @RequestBody Map<String, String> body) {
+        requireOwnedJob(id);
         return ResponseEntity.ok(toMap(service.complete(id, body.get("resultRef"))));
     }
 
     @PostMapping("/ai-jobs/{id}/fail")
     public ResponseEntity<?> fail(@PathVariable UUID id, @RequestBody Map<String, String> body) {
+        requireOwnedJob(id);
         return ResponseEntity.ok(toMap(service.fail(id, body.get("errorMessage"))));
     }
 
     @GetMapping("/ai-jobs/{id}")
     public ResponseEntity<?> get(@PathVariable UUID id) {
-        return ResponseEntity.ok(toMap(service.get(id)));
+        return ResponseEntity.ok(toMap(requireOwnedJob(id)));
     }
 
     @GetMapping("/notifications/{userId}")
     public ResponseEntity<?> notifications(@PathVariable UUID userId) {
-        return ResponseEntity.ok(service.forUser(userId).stream().map(n -> Map.of(
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        return ResponseEntity.ok(service.forUser(owner).stream().map(n -> Map.of(
                 "id", n.id().toString(),
                 "title", n.title(),
                 "body", n.body(),
@@ -61,6 +72,12 @@ public class AsyncJobController {
                 "privacySafe", n.privacySafe(),
                 "deliveryStatus", n.deliveryStatus()
         )).toList());
+    }
+
+    private AsyncJobNotificationService.AiJob requireOwnedJob(UUID id) {
+        var job = service.get(id);
+        CurrentUser.requireSelfOrAdmin(job.userId());
+        return job;
     }
 
     private static Map<String, Object> toMap(AsyncJobNotificationService.AiJob job) {

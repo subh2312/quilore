@@ -10,7 +10,7 @@
 | ID | Severity | Status | Notes |
 |---|---|---|---|
 | B1 | Blocker | DONE | OAuth2 resource-server JWT; JPA users+refresh_sessions; JwtBearerAuthIntegrationTest |
-| B2 | Blocker | TODO | Object-level authz; no client-chosen userId ownership |
+| B2 | Blocker | DONE | CurrentUser.requireSelfOrAdmin on owned routes; ObjectLevelAuthorizationTest |
 | B3 | Blocker | TODO | Replace ConcurrentHashMap production state with PostgreSQL |
 | B4 | Blocker | TODO | Remove all-zero AES fallback outside tests; fail closed in staging/prod |
 | B5 | Blocker | TODO | AI invoke must not fake success — adapters or explicit unavailable |
@@ -58,6 +58,7 @@
 | Date | Finding | Evidence |
 |---|---|---|
 | 2026-08-11 | Phase 0 | Tracker created; classification corrected |
+| 2026-08-11 | B1 | `./gradlew test --tests com.quilore.auth.JwtBearerAuthIntegrationTest` PASS; USER/ADMIN/missing/tampered/expired/iss/aud + refresh rotation |
 
 ## Blockers / follow-ups
 

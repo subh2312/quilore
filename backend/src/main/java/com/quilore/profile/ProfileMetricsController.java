@@ -1,5 +1,6 @@
 package com.quilore.profile;
 
+import com.quilore.security.CurrentUser;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,19 +27,22 @@ public class ProfileMetricsController {
 
     @PutMapping("/profiles/{userId}")
     public ResponseEntity<?> upsertProfile(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
-        var p = service.upsertProfile(userId, body);
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        var p = service.upsertProfile(owner, body);
         return ResponseEntity.ok(profileMap(p));
     }
 
     @GetMapping("/profiles/{userId}")
     public ResponseEntity<?> getProfile(@PathVariable UUID userId) {
-        return ResponseEntity.ok(profileMap(service.getProfile(userId)));
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        return ResponseEntity.ok(profileMap(service.getProfile(owner)));
     }
 
     @PostMapping("/body-metrics/{userId}")
     public ResponseEntity<?> logMetric(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
         var m = service.logMetric(
-                userId,
+                owner,
                 LocalDate.parse(String.valueOf(body.get("recordedOn"))),
                 body.get("weightKg") == null ? null : ((Number) body.get("weightKg")).doubleValue(),
                 body.get("waistCm") == null ? null : ((Number) body.get("waistCm")).doubleValue(),
@@ -58,7 +62,8 @@ public class ProfileMetricsController {
             @RequestParam String from,
             @RequestParam String to
     ) {
-        return ResponseEntity.ok(service.metricsBetween(userId, LocalDate.parse(from), LocalDate.parse(to)).stream()
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        return ResponseEntity.ok(service.metricsBetween(owner, LocalDate.parse(from), LocalDate.parse(to)).stream()
                 .map(m -> Map.of(
                         "id", m.id().toString(),
                         "recordedOn", m.recordedOn().toString(),
@@ -68,8 +73,9 @@ public class ProfileMetricsController {
 
     @PostMapping("/check-ins/{userId}")
     public ResponseEntity<?> checkIn(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
         var c = service.logCheckIn(
-                userId,
+                owner,
                 LocalDate.parse(String.valueOf(body.get("recordedOn"))),
                 asInt(body.get("mood")),
                 asInt(body.get("recovery")),

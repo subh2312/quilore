@@ -1,5 +1,6 @@
 package com.quilore.sync;
 
+import com.quilore.security.CurrentUser;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,21 +29,24 @@ public class SyncController {
             @PathVariable UUID userId,
             @RequestParam(defaultValue = "0") long lastPulledAt
     ) {
-        return ResponseEntity.ok(syncService.pull(userId, lastPulledAt));
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        return ResponseEntity.ok(syncService.pull(owner, lastPulledAt));
     }
 
     @PostMapping("/{userId}/push")
     public ResponseEntity<?> push(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> mutations = (List<Map<String, Object>>) body.getOrDefault("mutations", List.of());
-        return ResponseEntity.ok(syncService.push(userId, mutations));
+        return ResponseEntity.ok(syncService.push(owner, mutations));
     }
 
     @GetMapping("/{userId}/status")
     public ResponseEntity<?> status(@PathVariable UUID userId) {
-        var last = syncService.lastSync(userId);
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        var last = syncService.lastSync(owner);
         return ResponseEntity.ok(Map.of(
-                "userId", userId.toString(),
+                "userId", owner.toString(),
                 "lastSuccessfulSync", last == null ? "" : last.toString()
         ));
     }

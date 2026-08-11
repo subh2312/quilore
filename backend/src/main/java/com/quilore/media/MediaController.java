@@ -1,5 +1,6 @@
 package com.quilore.media;
 
+import com.quilore.security.CurrentUser;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -9,7 +10,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/media")
@@ -23,12 +23,13 @@ public class MediaController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
-        UUID userId = UUID.fromString(body.get("userId"));
+        // Ownership always from principal — never from client-supplied userId (B2/H3).
+        var owner = CurrentUser.requireUserId();
         byte[] bytes = body.containsKey("contentBase64")
                 ? Base64.getDecoder().decode(body.get("contentBase64"))
                 : body.getOrDefault("content", "").getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok(minioMediaService.registerObject(
-                userId,
+                owner,
                 body.get("objectKey"),
                 body.get("contentType"),
                 bytes

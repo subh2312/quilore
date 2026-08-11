@@ -1,5 +1,6 @@
 package com.quilore.notify;
 
+import com.quilore.security.CurrentUser;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,8 +24,9 @@ public class MealReminderController {
 
     @PostMapping("/{userId}/prefs")
     public ResponseEntity<?> prefs(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
         var prefs = service.savePrefs(
-                userId,
+                owner,
                 Boolean.TRUE.equals(body.get("enabled")),
                 ((Number) body.getOrDefault("windowStartMinute", 480)).intValue(),
                 ((Number) body.getOrDefault("windowEndMinute", 1260)).intValue(),
@@ -39,13 +41,15 @@ public class MealReminderController {
 
     @PostMapping("/{userId}/meal-logged")
     public ResponseEntity<?> mealLogged(@PathVariable UUID userId) {
-        service.recordMealLog(userId);
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        service.recordMealLog(owner);
         return ResponseEntity.ok(Map.of("recorded", true));
     }
 
     @PostMapping("/{userId}/tick")
     public ResponseEntity<?> tick(@PathVariable UUID userId, @RequestBody(required = false) Map<String, String> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
         LocalTime now = body != null && body.get("now") != null ? LocalTime.parse(body.get("now")) : LocalTime.now();
-        return ResponseEntity.ok(service.maybeSendReminder(userId, now));
+        return ResponseEntity.ok(service.maybeSendReminder(owner, now));
     }
 }

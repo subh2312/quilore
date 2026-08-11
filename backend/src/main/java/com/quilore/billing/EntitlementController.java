@@ -1,7 +1,10 @@
 package com.quilore.billing;
 
+import com.quilore.security.CurrentUser;
+import com.quilore.security.PermissionAuditService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,9 +20,11 @@ import java.util.UUID;
 public class EntitlementController {
 
     private final EntitlementService service;
+    private final PermissionAuditService permissionAuditService;
 
-    public EntitlementController(EntitlementService service) {
+    public EntitlementController(EntitlementService service, PermissionAuditService permissionAuditService) {
         this.service = service;
+        this.permissionAuditService = permissionAuditService;
     }
 
     @GetMapping("/plans")
@@ -34,18 +39,30 @@ public class EntitlementController {
 
     @GetMapping("/entitlements/{userId}")
     public ResponseEntity<?> entitlements(@PathVariable UUID userId) {
-        return ResponseEntity.ok(service.entitlementState(userId));
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        return ResponseEntity.ok(service.entitlementState(owner));
     }
 
     @PostMapping("/admin/entitlements/{userId}/plan")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> assign(@PathVariable UUID userId, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> assign(
+            @PathVariable UUID userId,
+            @RequestBody Map<String, String> body,
+            Authentication authentication
+    ) {
         service.assignPlan(userId, body.get("planCode"));
+        permissionAuditService.record(
+                authentication.getName(),
+                "ADMIN",
+                "ASSIGN_PLAN",
+                "target=" + userId + " plan=" + body.get("planCode")
+        );
         return ResponseEntity.ok(service.entitlementState(userId));
     }
 
     @PostMapping("/quotas/{userId}/consume")
     public ResponseEntity<?> consume(@PathVariable UUID userId, @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(service.consumeQuota(userId, body.get("featureKey")));
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        return ResponseEntity.ok(service.consumeQuota(owner, body.get("featureKey")));
     }
 }
