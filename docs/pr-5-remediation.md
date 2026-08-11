@@ -16,11 +16,11 @@
 | B5 | Blocker | DONE | Path B: invoke returns HTTP 503 unavailable/deferred; no accepted:true fake success |
 | B6 | Blocker | DONE | Local Postgres+pgvector Flyway proof (`prove-pgvector-migrations.sh`); Testcontainers IT when Docker available |
 | B7 | Blocker | DONE | Loopback binds + tunnel overlay; Caddy optional; `test_tunnel_overlay.sh` |
-| H1 | High | IN PROGRESS | Typed DTOs + validation on public request bodies |
+| H1 | High | DONE | Typed DTOs for auth/profile/media + AuthValidationTest |
 | H2 | High | DONE | Covered by B3 |
 | H3 | High | DONE | Covered by B2/B3 |
-| H4 | High | IN PROGRESS | Explicit non-medical / provenance boundaries |
-| H5 | High | IN PROGRESS | Honest partial classification; baseline integration coverage |
+| H4 | High | DONE | Nutrition/pose disclaimers + provenance; non-medical labels |
+| H5 | High | DONE | Feature matrix keeps MediaPipe/RAG/IFCT/push/Maestro partial |
 
 ## Feature classification (corrected)
 
@@ -28,14 +28,14 @@
 |---|---|---|
 | CI/CD publish/promote/rollback | production-ready (ops) | Workflows + script tests exist |
 | Observability (logs/metrics/correlation) | production-ready (ops) | Endpoints + redaction tests exist |
-| Bearer JWT + Spring Security | scaffold → **must become production-ready** | Issued tokens not wired into SecurityContext |
-| Object-level authorization | scaffold → **must become production-ready** | Routes accept arbitrary userId |
+| Bearer JWT + Spring Security | production-ready | Resource-server JWT + principal/roles tests |
+| Object-level authorization | production-ready | Principal ownership + cross-user 403 tests |
 | Domain persistence (users/sessions/profiles/etc.) | production-ready (data plane) | JPA + V2–V6; PersistenceRestartIntegrationTest |
-| Field encryption | scaffold → **must become production-ready** | All-zero key fallback unsafe |
-| AI invoke / live inference | scaffold → **must become unavailable/deferred or real** | Placeholder success-like response |
-| Postgres+pgvector migrations | scaffold → **must be proven** | Schema present; no live Testcontainers proof |
+| Field encryption | production-ready (injuries field) | Fail-closed keys; injuries encrypted at rest |
+| AI invoke / live inference | deferred / unavailable | HTTP 503 explicit deferred envelope (Path B) |
+| Postgres+pgvector migrations | proven (local PG); Testcontainers when Docker available | `prove-pgvector-migrations.sh` evidence |
 | MinIO media | partial / deferred | DB metadata persisted; live upload deferred (`minio.enabled=false`) |
-| VPS deploy path | incorrect for current ops → **must match tunnel/loopback** | Caddy/80/443 overlay not the VPS model |
+| VPS deploy path | production-ready (ops path) | Loopback + Cloudflare Tunnel; Caddy optional |
 | MediaPipe on-device | partial | Landmark contract + server heuristics only |
 | Live RAG / pgvector retrieval | partial | In-memory hybrid ranker + SQL reference |
 | IFCT food resolution | partial | Seeded subset, not full IFCT 2017 |
@@ -61,6 +61,10 @@
 | 2026-08-11 | B1 | `./gradlew test --tests com.quilore.auth.JwtBearerAuthIntegrationTest` PASS; USER/ADMIN/missing/tampered/expired/iss/aud + refresh rotation |
 | 2026-08-11 | B2 | `./gradlew test --tests com.quilore.security.ObjectLevelAuthorizationTest` PASS; cross-user 403 for profile/quota/sync/media/notifications |
 | 2026-08-11 | B3 | `./gradlew test` PASS; ConcurrentHashMap domain stores → JPA; V6 sync/macro/micro/meal-log/media status; MinIO metadata deferred (`minio.enabled=false`); PersistenceRestartIntegrationTest |
+| 2026-08-11 | B4 | FieldEncryptorTest + EncryptedInjuriesPersistenceTest PASS; staging-like all-zero/missing key fails |
+| 2026-08-11 | B5 | `python3 -m pytest ai-service/tests/test_contracts.py` PASS; invoke → 503 unavailable/deferred |
+| 2026-08-11 | B6 | `bash deploy/scripts/prove-pgvector-migrations.sh` PASS on local Postgres 16+pgvector (pgcrypto/vector, vector(768), HNSW) |
+| 2026-08-11 | B7 | `bash deploy/tests/test_tunnel_overlay.sh` PASS; loopback host_ip + no Caddy on tunnel path |
 
 ## B3 notes
 

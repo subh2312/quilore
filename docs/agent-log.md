@@ -4,6 +4,22 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Completed H1/H4/H5 — typed auth/profile/media DTOs, non-medical pose/nutrition boundaries, honest partial classification retained.
+- **Why:** High findings for public contract hardening without claiming unfinished product features complete.
+- **How:** Jakarta Validation DTOs + AuthValidationTest; pose/nutrition disclaimer+provenance; remediation matrix marks MediaPipe/RAG/IFCT/push/Maestro partial.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Final verification — full backend/AI/deploy tunnel/pgvector evidence suite before PR description update.
+- **Why:** Phase 7 exit criteria for merge-ready remediation evidence.
+- **How:** `./gradlew test`, `pytest`, tunnel overlay smoke, prove-pgvector-migrations.sh; update PR body with completion table + handoff.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Completed B4/B5/B6/B7 — encryption fail-closed, AI invoke deferred 503, real pgvector migration proof, Cloudflare Tunnel loopback deploy path.
 - **Why:** Remaining merge blockers after B1–B3.
 - **How:** FieldEncryptor + injuries encryption; FastAPI Path B 503; LocalPostgresPgvectorMigrationIT + prove script; tunnel overlay + loopback binds; Caddy optional.

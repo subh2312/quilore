@@ -1,6 +1,7 @@
 package com.quilore.profile;
 
 import com.quilore.security.CurrentUser;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -26,9 +28,21 @@ public class ProfileMetricsController {
     }
 
     @PutMapping("/profiles/{userId}")
-    public ResponseEntity<?> upsertProfile(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> upsertProfile(
+            @PathVariable UUID userId,
+            @Valid @RequestBody ProfileUpsertRequest body
+    ) {
         UUID owner = CurrentUser.requireSelfOrAdmin(userId);
-        var p = service.upsertProfile(owner, body);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("age", body.age());
+        payload.put("sex", body.sex());
+        payload.put("heightCm", body.heightCm());
+        payload.put("weightKg", body.weightKg());
+        payload.put("trainingExperience", body.trainingExperience() == null ? "" : body.trainingExperience());
+        payload.put("dietaryPreferences", body.dietaryPreferences() == null ? "" : body.dietaryPreferences());
+        payload.put("injuriesInfo", body.injuriesInfo() == null ? "" : body.injuriesInfo());
+        payload.put("equipmentAccess", body.equipmentAccess() == null ? "" : body.equipmentAccess());
+        var p = service.upsertProfile(owner, payload);
         return ResponseEntity.ok(profileMap(p));
     }
 
