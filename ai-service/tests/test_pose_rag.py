@@ -1,6 +1,9 @@
 """Tests for pose kinematics, exercise mapping, and hybrid search."""
 
+from fastapi.testclient import TestClient
+
 from app.exercises.mapping import map_exercise
+from app.main import app
 from app.pose.kinematics import Landmark, PoseFrame, analyze_pose, ego_lifting_recommendation
 from app.pose.mediapipe_contract import MEDIAPIPE_LANDMARK_COUNT, validate_mediapipe_frame
 from app.rag.hybrid_search import Chunk, hybrid_search
