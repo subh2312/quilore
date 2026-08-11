@@ -7,10 +7,10 @@ Implements the fallback matrix from docs/quilore_document_set.md §3.6:
   Meal parse:  Groq → OpenRouter → (Spring Boot rule-based)
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.config import settings
@@ -18,7 +18,7 @@ from app.config import settings
 router = APIRouter()
 
 
-class TaskType(str, Enum):
+class TaskType(StrEnum):
     """AI task categories matching the provider fallback matrix."""
 
     CHAT = "chat"

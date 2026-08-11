@@ -1,7 +1,7 @@
 """Quilore AI Orchestration Service — FastAPI application."""
 
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import FastAPI
 
@@ -39,5 +39,5 @@ async def health():
     return {
         "status": "UP",
         "service": "quilore-ai-service",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
