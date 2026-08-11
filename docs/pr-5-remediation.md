@@ -66,6 +66,7 @@
 | 2026-08-11 | B6 | `bash deploy/scripts/prove-pgvector-migrations.sh` PASS on local Postgres 16+pgvector (pgcrypto/vector, vector(768), HNSW) |
 | 2026-08-11 | B7 | `bash deploy/tests/test_tunnel_overlay.sh` PASS; loopback host_ip + no Caddy on tunnel path |
 | 2026-08-11 | H1/H4/H5 | AuthValidationTest PASS; pose disclaimer test PASS; partial labels retained in matrix |
+| 2026-08-11 | Final | Local full suite PASS; CI green https://github.com/subh2312/quilore/actions/runs/31519723247 on `1b32dfe` |
 
 ## B3 notes
 
