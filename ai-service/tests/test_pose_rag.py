@@ -75,9 +75,6 @@ def test_hybrid_search_filters_and_ranks():
 
 
 def test_pose_analyze_endpoint_includes_non_medical_disclaimer():
-    from fastapi.testclient import TestClient
-    from app.main import app
-
     client = TestClient(app)
     landmarks = [{"x": 0, "y": 0, "z": 0, "visibility": 1} for _ in range(33)]
     response = client.post("/ai/pose/analyze", json={"frame": {"landmarks": landmarks}})

@@ -4,13 +4,17 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.pose.kinematics import (
-    KinematicsResult,
     PoseFrame,
     analyze_pose,
     ego_lifting_recommendation,
 )
 
 router = APIRouter()
+
+POSE_DISCLAIMER = (
+    "Informational coaching heuristic only — not a medical diagnosis "
+    "or physical therapy advice."
+)
 
 
 class PoseAnalyzeRequest(BaseModel):
@@ -33,9 +37,7 @@ async def analyze(body: PoseAnalyzeRequest) -> dict:
     """
     result = analyze_pose(body.frame, exercise=body.exercise, min_visibility=body.min_visibility)
     payload = result.model_dump()
-    payload["disclaimer"] = (
-        "Informational coaching heuristic only — not a medical diagnosis or physical therapy advice."
-    )
+    payload["disclaimer"] = POSE_DISCLAIMER
     payload["provenance"] = {
         "mode": "server_heuristic",
         "mediapipe": "partial_contract_only",
@@ -53,8 +55,6 @@ async def ego_lift(body: EgoLiftRequest) -> dict:
     )
     return {
         **rec,
-        "disclaimer": (
-            "Informational coaching heuristic only — not a medical diagnosis or physical therapy advice."
-        ),
+        "disclaimer": POSE_DISCLAIMER,
         "provenance": {"mode": "velocity_heuristic", "confidence_limited": True},
     }
