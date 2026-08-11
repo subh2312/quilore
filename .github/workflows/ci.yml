@@ -100,6 +100,9 @@ jobs:
       - name: Validate promotion / rollback scripts
         run: bash deploy/tests/test_promote_rollback.sh
 
+      - name: Validate secret rotation scripts
+        run: bash deploy/tests/test_secret_rotation.sh
+
   # ─── Docker image build (no publish on PRs) ──────────────
   docker-build:
     name: Docker Image Build
@@ -153,4 +156,11 @@ jobs:
           docker compose
           -f docker-compose.yml
           -f deploy/overlays/docker-compose.prod.yml
+          config --quiet
+
+      - name: Validate TLS overlay
+        run: >
+          docker compose
+          -f docker-compose.yml
+          -f deploy/overlays/docker-compose.tls.yml
           config --quiet

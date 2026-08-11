@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Implemented Story 15.2 encryption/secret management baseline and Story 15.1 RBAC/admin authorization (TLS overlay, secret rotation, AES-GCM field encryptor, admin role gates + audit).
+- **Why:** Plane stories `588bd4d3-5598-4125-9b0e-f53f51413d89` and `fe100b45-025d-4167-b62f-c65c70fdcc5b`. Plane MCP unavailable; criteria from `docs/quilore-plane-backlog.md`.
+- **How:** Added Caddy TLS overlay, `rotate-secrets.sh` with CI tests, `FieldEncryptor`, cleared plaintext placeholders from `.env.example`; added USER/SUPPORT/ADMIN roles, `/api/admin/**` enforcement, safe 401/403 JSON, permission audit service, and Flyway V2.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Implemented Story 16.1 structured logging, metrics, and distributed tracing across Spring Boot and FastAPI (correlation IDs, Prometheus metrics, job traces, redaction policy).
 - **Why:** Plane story `7240c333-9211-4fa2-8cf6-66f2614049ed` / backlog Story 16.1. Plane MCP unavailable; criteria from `docs/quilore-plane-backlog.md`.
 - **How:** Added backend Logstash JSON logging + Micrometer Prometheus + correlation filter/JobTrace/redactor; FastAPI structlog + middleware metrics/provider gauges + `/metrics`; Prometheus scrape sample under `deploy/observability/`.

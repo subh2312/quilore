@@ -61,3 +61,8 @@ logging:
   level:
     root: INFO
     com.quilore: INFO
+
+quilore:
+  security:
+    data-encryption-key: ${DATA_ENCRYPTION_KEY:}
+    jwt-secret: ${JWT_SECRET:}

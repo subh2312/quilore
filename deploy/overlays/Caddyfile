@@ -1,0 +1,30 @@
+{$QUILORE_DOMAIN:localhost} {
+	encode gzip
+
+	# Spring Boot API
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+	handle /actuator/* {
+		reverse_proxy backend:8080
+	}
+	handle /v3/* {
+		reverse_proxy backend:8080
+	}
+	handle /swagger-ui* {
+		reverse_proxy backend:8080
+	}
+
+	# FastAPI AI orchestration
+	handle /ai/* {
+		reverse_proxy ai-service:8000
+	}
+	handle /health {
+		reverse_proxy ai-service:8000
+	}
+	handle /metrics {
+		reverse_proxy ai-service:8000
+	}
+
+	respond "Quilore TLS edge" 200
+}

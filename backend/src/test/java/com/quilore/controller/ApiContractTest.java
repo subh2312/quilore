@@ -54,8 +54,8 @@ class ApiContractTest {
 
     @Test
     void unknownApiRequiresAuthentication() throws Exception {
-        // Stateless security without a JWT entry point currently returns 403 for anonymous callers.
         mockMvc.perform(get("/api/does-not-exist-yet"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("unauthorized"));
     }
 }

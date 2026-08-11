@@ -99,6 +99,8 @@ Automated contracts (Story 16.3): backend MockMvc API contracts, AI gateway norm
 
 Observability (Story 16.1): JSON structured logs with `X-Correlation-ID` / `traceparent`, Prometheus metrics (`/actuator/prometheus`, `/metrics`), job trace helpers, and sensitive-data redaction. Local scrape config: `deploy/observability/prometheus.yml`.
 
+Security baseline (Stories 15.1–15.2): RBAC roles `USER`/`SUPPORT`/`ADMIN` with `/api/admin/**` gates + permission audit; TLS via Caddy overlay; secret rotation script (`deploy/scripts/rotate-secrets.sh`); AES-GCM `FieldEncryptor` keyed by `DATA_ENCRYPTION_KEY`. See `deploy/secrets/README.md`.
+
 ## PR / Commit Conventions
 
 - Keep commits scoped to one service (`client`, `backend`, `ai-service`, `docs`) where possible.

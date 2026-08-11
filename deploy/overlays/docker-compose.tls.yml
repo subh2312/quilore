@@ -1,0 +1,30 @@
+# TLS termination overlay (Story 15.2) — external traffic enters via Caddy HTTPS.
+# Usage (from repo root):
+#   QUILORE_DOMAIN=app.example.com docker compose \
+#     -f docker-compose.yml \
+#     -f deploy/overlays/docker-compose.tls.yml \
+#     up -d
+#
+# Prefer publishing only 80/443 externally; keep backend/AI ports firewalled in production.
+
+services:
+  caddy:
+    image: caddy:2.9-alpine
+    container_name: quilore-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      QUILORE_DOMAIN: ${QUILORE_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - ai-service
+
+volumes:
+  caddy_data:
+  caddy_config:
