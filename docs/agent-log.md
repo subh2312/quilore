@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Implemented Story 16.1 structured logging, metrics, and distributed tracing across Spring Boot and FastAPI (correlation IDs, Prometheus metrics, job traces, redaction policy).
+- **Why:** Plane story `7240c333-9211-4fa2-8cf6-66f2614049ed` / backlog Story 16.1. Plane MCP unavailable; criteria from `docs/quilore-plane-backlog.md`.
+- **How:** Added backend Logstash JSON logging + Micrometer Prometheus + correlation filter/JobTrace/redactor; FastAPI structlog + middleware metrics/provider gauges + `/metrics`; Prometheus scrape sample under `deploy/observability/`.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Implemented Story 16.3 automated API, contract, and E2E testing — backend MockMvc contracts, AI normalized invoke envelope + pytest contracts, client critical-journey Jest suite + Maestro scaffold, CI `npm test` gate.
 - **Why:** Plane story `6f818927-e160-4d14-bdae-162895880f6d` / backlog Story 16.3. Plane MCP unavailable; criteria from `docs/quilore-plane-backlog.md`.
 - **How:** Added `NormalizedAIResponse` + `POST /ai/tasks/{task}/invoke`; expanded backend OpenAPI/health/security contracts; Jest journey contracts for the six-tab surface with Maestro YAML for future device runs; wired client tests into CI so regressions fail the pipeline.

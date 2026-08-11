@@ -34,4 +34,30 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include:
+          - health
+          - info
+          - prometheus
+          - metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+    prometheus:
+      enabled: true
+    metrics:
+      enabled: true
+  metrics:
+    tags:
+      application: quilore-backend
+  observations:
+    key-values:
+      service: quilore-backend
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.quilore: INFO

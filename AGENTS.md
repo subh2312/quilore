@@ -97,6 +97,8 @@ CI/CD overview (Story 16.4): PR checks in `.github/workflows/ci.yml`; versioned 
 
 Automated contracts (Story 16.3): backend MockMvc API contracts, AI gateway normalized envelope pytest contracts, client critical-journey Jest contracts (Maestro YAML under `client/e2e/` for device runs).
 
+Observability (Story 16.1): JSON structured logs with `X-Correlation-ID` / `traceparent`, Prometheus metrics (`/actuator/prometheus`, `/metrics`), job trace helpers, and sensitive-data redaction. Local scrape config: `deploy/observability/prometheus.yml`.
+
 ## PR / Commit Conventions
 
 - Keep commits scoped to one service (`client`, `backend`, `ai-service`, `docs`) where possible.

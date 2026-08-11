@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>correlationId</includeMdcKeyName>
+            <includeMdcKeyName>traceparent</includeMdcKeyName>
+            <includeMdcKeyName>jobId</includeMdcKeyName>
+            <includeMdcKeyName>jobName</includeMdcKeyName>
+            <includeMdcKeyName>durationMs</includeMdcKeyName>
+            <includeMdcKeyName>httpStatus</includeMdcKeyName>
+            <customFields>{"service":"quilore-backend"}</customFields>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="JSON"/>
+    </root>
+</configuration>
