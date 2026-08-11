@@ -1,0 +1,10 @@
+name: pr-evidence
+
+on:
+  pull_request:
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "PR evidence workflow placeholder"
