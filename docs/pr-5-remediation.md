@@ -12,15 +12,15 @@
 | B1 | Blocker | DONE | OAuth2 resource-server JWT; JPA users+refresh_sessions; JwtBearerAuthIntegrationTest |
 | B2 | Blocker | DONE | CurrentUser.requireSelfOrAdmin on owned routes; ObjectLevelAuthorizationTest |
 | B3 | Blocker | DONE | JPA repos for profiles/entitlements/sync/jobs/media/etc.; V6; PersistenceRestartIntegrationTest |
-| B4 | Blocker | TODO | Remove all-zero AES fallback outside tests; fail closed in staging/prod |
-| B5 | Blocker | TODO | AI invoke must not fake success — adapters or explicit unavailable |
-| B6 | Blocker | TODO | Prove Flyway on real Postgres+pgvector (Testcontainers) |
-| B7 | Blocker | TODO | VPS path = loopback + Cloudflare Tunnel (Caddy optional/non-default) |
-| H1 | High | TODO | Typed DTOs + validation on public request bodies |
-| H2 | High | TODO | Covered by B3 (durable sessions/quotas/audits/sync/notifications) |
-| H3 | High | TODO | Covered by B2/B3 (media ownership + metadata) |
-| H4 | High | TODO | Explicit non-medical / provenance boundaries |
-| H5 | High | TODO | Honest partial classification; baseline integration coverage |
+| B4 | Blocker | DONE | FieldEncryptor fail-closed; injuries encrypted at rest; FieldEncryptorTest + EncryptedInjuriesPersistenceTest |
+| B5 | Blocker | DONE | Path B: invoke returns HTTP 503 unavailable/deferred; no accepted:true fake success |
+| B6 | Blocker | DONE | Local Postgres+pgvector Flyway proof (`prove-pgvector-migrations.sh`); Testcontainers IT when Docker available |
+| B7 | Blocker | DONE | Loopback binds + tunnel overlay; Caddy optional; `test_tunnel_overlay.sh` |
+| H1 | High | IN PROGRESS | Typed DTOs + validation on public request bodies |
+| H2 | High | DONE | Covered by B3 |
+| H3 | High | DONE | Covered by B2/B3 |
+| H4 | High | IN PROGRESS | Explicit non-medical / provenance boundaries |
+| H5 | High | IN PROGRESS | Honest partial classification; baseline integration coverage |
 
 ## Feature classification (corrected)
 

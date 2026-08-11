@@ -4,6 +4,22 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Completed B4/B5/B6/B7 — encryption fail-closed, AI invoke deferred 503, real pgvector migration proof, Cloudflare Tunnel loopback deploy path.
+- **Why:** Remaining merge blockers after B1–B3.
+- **How:** FieldEncryptor + injuries encryption; FastAPI Path B 503; LocalPostgresPgvectorMigrationIT + prove script; tunnel overlay + loopback binds; Caddy optional.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Starting H1/H4/H5 — typed validation DTOs, non-medical/provenance boundaries, honest partial labels.
+- **Why:** High findings for public contract hardening and classification honesty.
+- **How:** Auth/profile/media request DTOs; disclaimer fields; update remediation feature matrix.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Completed B3 — replaced ConcurrentHashMap production domain state with PostgreSQL JPA repositories.
 - **Why:** Merge blocker B3: profiles, quotas, sync, notifications, media metadata, etc. must survive restart.
 - **How:** Entities/repos for V2–V4 tables + V6 sync/macro/micro/meal-log/media status; MinIO metadata deferred; PersistenceRestartIntegrationTest; `./gradlew test` PASS.

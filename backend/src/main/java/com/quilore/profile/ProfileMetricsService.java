@@ -1,5 +1,6 @@
 package com.quilore.profile;
 
+import com.quilore.security.FieldEncryptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,15 +40,18 @@ public class ProfileMetricsService {
     private final UserProfileRepository profileRepository;
     private final BodyMetricRepository bodyMetricRepository;
     private final CheckInRepository checkInRepository;
+    private final FieldEncryptor fieldEncryptor;
 
     public ProfileMetricsService(
             UserProfileRepository profileRepository,
             BodyMetricRepository bodyMetricRepository,
-            CheckInRepository checkInRepository
+            CheckInRepository checkInRepository,
+            FieldEncryptor fieldEncryptor
     ) {
         this.profileRepository = profileRepository;
         this.bodyMetricRepository = bodyMetricRepository;
         this.checkInRepository = checkInRepository;
+        this.fieldEncryptor = fieldEncryptor;
     }
 
     @Transactional
@@ -61,7 +65,8 @@ public class ProfileMetricsService {
         entity.setWeightKg(((Number) body.get("weightKg")).doubleValue());
         entity.setTrainingExperience(String.valueOf(body.getOrDefault("trainingExperience", "")));
         entity.setDietaryPreferences(String.valueOf(body.getOrDefault("dietaryPreferences", "")));
-        entity.setInjuriesInfo(String.valueOf(body.getOrDefault("injuriesInfo", "")));
+        String injuries = String.valueOf(body.getOrDefault("injuriesInfo", ""));
+        entity.setInjuriesInfo(fieldEncryptor.encrypt(injuries));
         entity.setEquipmentAccess(String.valueOf(body.getOrDefault("equipmentAccess", "")));
         entity.setInjuriesDisclaimer(INJURY_DISCLAIMER);
         return toProfile(profileRepository.save(entity));
@@ -115,6 +120,14 @@ public class ProfileMetricsService {
                 .toList();
     }
 
+    /** Raw ciphertext as stored — for encryption persistence evidence tests. */
+    @Transactional(readOnly = true)
+    public String rawStoredInjuriesInfo(UUID userId) {
+        return profileRepository.findById(userId)
+                .map(UserProfileEntity::getInjuriesInfo)
+                .orElse(null);
+    }
+
     private Profile toProfile(UserProfileEntity entity) {
         return new Profile(
                 entity.getUserId(),
@@ -124,11 +137,23 @@ public class ProfileMetricsService {
                 entity.getWeightKg(),
                 entity.getTrainingExperience(),
                 entity.getDietaryPreferences(),
-                entity.getInjuriesInfo(),
+                decryptInjuries(entity.getInjuriesInfo()),
                 entity.getEquipmentAccess(),
                 entity.getInjuriesDisclaimer(),
                 entity.getUpdatedAt()
         );
+    }
+
+    private String decryptInjuries(String stored) {
+        if (stored == null || stored.isBlank()) {
+            return stored == null ? "" : stored;
+        }
+        try {
+            return fieldEncryptor.decrypt(stored);
+        } catch (IllegalStateException ex) {
+            // Legacy plaintext rows (pre-B4) remain readable until re-saved.
+            return stored;
+        }
     }
 
     private static void require(Map<String, Object> body, String... keys) {

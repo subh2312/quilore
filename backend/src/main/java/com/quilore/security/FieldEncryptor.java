@@ -1,6 +1,5 @@
 package com.quilore.security;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -13,7 +12,9 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 /**
- * AES-256-GCM field encryptor for sensitive user data at rest (Story 15.2).
+ * AES-256-GCM field encryptor for sensitive user data at rest (B4 / Story 15.2).
+ * Staging/production must supply a non-zero 32-byte base64 key; all-zero fallback
+ * is allowed only when {@code quilore.security.allow-insecure-defaults=true}.
  */
 @Component
 public class FieldEncryptor {
@@ -23,21 +24,35 @@ public class FieldEncryptor {
     private static final int IV_BYTES = 12;
 
     private final SecretKey key;
+    private final boolean encryptionActive;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public FieldEncryptor(
-            @Value("${quilore.security.data-encryption-key:}") String base64Key
-    ) {
+    public FieldEncryptor(SecurityProperties properties) {
+        SecuritySecretsValidator.validateEncryptionKey(
+                properties.getDataEncryptionKey(), properties.isAllowInsecureDefaults());
+        String base64Key = properties.getDataEncryptionKey();
         if (base64Key == null || base64Key.isBlank()) {
-            // Dev/test fallback — production must set DATA_ENCRYPTION_KEY.
-            this.key = new SecretKeySpec(new byte[32], "AES");
-        } else {
-            byte[] raw = Base64.getDecoder().decode(base64Key.trim());
-            if (raw.length != 32) {
-                throw new IllegalStateException("DATA_ENCRYPTION_KEY must decode to 32 bytes");
+            if (!properties.isAllowInsecureDefaults()) {
+                throw new IllegalStateException("DATA_ENCRYPTION_KEY is required");
             }
-            this.key = new SecretKeySpec(raw, "AES");
+            this.key = new SecretKeySpec(new byte[32], "AES");
+            this.encryptionActive = false;
+            return;
         }
+        byte[] raw = Base64.getDecoder().decode(base64Key.trim());
+        if (raw.length != 32) {
+            throw new IllegalStateException("DATA_ENCRYPTION_KEY must decode to 32 bytes");
+        }
+        if (isAllZero(raw) && !properties.isAllowInsecureDefaults()) {
+            throw new IllegalStateException("DATA_ENCRYPTION_KEY must not be an all-zero key");
+        }
+        this.key = new SecretKeySpec(raw, "AES");
+        this.encryptionActive = !isAllZero(raw);
+    }
+
+    /** True when a non-zero key is configured (encryption applied to sensitive fields). */
+    public boolean isEncryptionActive() {
+        return encryptionActive;
     }
 
     public String encrypt(String plaintext) {
@@ -77,5 +92,14 @@ public class FieldEncryptor {
         } catch (GeneralSecurityException | IllegalArgumentException ex) {
             throw new IllegalStateException("Decryption failed", ex);
         }
+    }
+
+    private static boolean isAllZero(byte[] raw) {
+        for (byte b : raw) {
+            if (b != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 }
