@@ -30,16 +30,16 @@
 | Observability (logs/metrics/correlation) | production-ready (ops) | Endpoints + redaction tests exist |
 | Bearer JWT + Spring Security | scaffold → **must become production-ready** | Issued tokens not wired into SecurityContext |
 | Object-level authorization | scaffold → **must become production-ready** | Routes accept arbitrary userId |
-| Domain persistence (users/sessions/profiles/etc.) | implemented but not persisted | ConcurrentHashMap stores |
+| Domain persistence (users/sessions/profiles/etc.) | production-ready (data plane) | JPA + V2–V6; PersistenceRestartIntegrationTest |
 | Field encryption | scaffold → **must become production-ready** | All-zero key fallback unsafe |
 | AI invoke / live inference | scaffold → **must become unavailable/deferred or real** | Placeholder success-like response |
 | Postgres+pgvector migrations | scaffold → **must be proven** | Schema present; no live Testcontainers proof |
-| MinIO media | scaffold / partial | Metadata helper + public URL construction; no real client upload authz |
+| MinIO media | partial / deferred | DB metadata persisted; live upload deferred (`minio.enabled=false`) |
 | VPS deploy path | incorrect for current ops → **must match tunnel/loopback** | Caddy/80/443 overlay not the VPS model |
 | MediaPipe on-device | partial | Landmark contract + server heuristics only |
 | Live RAG / pgvector retrieval | partial | In-memory hybrid ranker + SQL reference |
 | IFCT food resolution | partial | Seeded subset, not full IFCT 2017 |
-| Push notifications | partial | In-memory SENT records only |
+| Push notifications | partial | Durable SENT records in DB; delivery channel still stub |
 | Device E2E (Maestro) | scaffold/contract only | YAML present; not run in CI/device |
 
 ## Implementation plan (ordered)
