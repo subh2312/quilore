@@ -9,7 +9,7 @@
 
 | ID | Severity | Status | Notes |
 |---|---|---|---|
-| B1 | Blocker | TODO | JWT must establish Spring Security principal/roles at runtime |
+| B1 | Blocker | DONE | OAuth2 resource-server JWT; JPA users+refresh_sessions; JwtBearerAuthIntegrationTest |
 | B2 | Blocker | TODO | Object-level authz; no client-chosen userId ownership |
 | B3 | Blocker | TODO | Replace ConcurrentHashMap production state with PostgreSQL |
 | B4 | Blocker | TODO | Remove all-zero AES fallback outside tests; fail closed in staging/prod |

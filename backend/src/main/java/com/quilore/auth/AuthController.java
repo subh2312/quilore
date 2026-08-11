@@ -1,14 +1,15 @@
 package com.quilore.auth;
 
+import com.quilore.security.CurrentUser;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,14 +31,14 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
         var session = authService.login(body.get("email"), body.get("password"));
-        var user = authService.requireUser(session.accessToken());
+        var user = authService.requireUserById(session.userId());
         return ResponseEntity.ok(sessionMap(user, session));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
         var session = authService.refresh(body.get("refreshToken"));
-        var user = authService.requireUser(session.accessToken());
+        var user = authService.requireUserById(session.userId());
         return ResponseEntity.ok(sessionMap(user, session));
     }
 
@@ -48,22 +49,15 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> me(@RequestHeader(value = "Authorization", required = false) String authorization) {
-        String token = extractBearer(authorization);
-        var user = authService.requireUser(token);
+    public ResponseEntity<?> me() {
+        UUID userId = CurrentUser.requireUserId();
+        var user = authService.requireUserById(userId);
         return ResponseEntity.ok(Map.of(
                 "id", user.id().toString(),
                 "email", user.email(),
                 "displayName", user.displayName(),
                 "role", user.role()
         ));
-    }
-
-    private static String extractBearer(String authorization) {
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
-            return "";
-        }
-        return authorization.substring("Bearer ".length()).trim();
     }
 
     private static Map<String, Object> sessionMap(AuthService.UserAccount user, AuthService.Session session) {

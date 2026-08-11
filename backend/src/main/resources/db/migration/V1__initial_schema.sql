@@ -1,7 +1,8 @@
 -- V1__initial_schema.sql
 -- Baseline schema for Quilore backend
 
--- Enable pgvector extension (requires pgvector/pgvector Docker image)
+-- Extension prerequisites (pgcrypto for gen_random_uuid on older PG; vector for RAG)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ─── Users ──────────────────────────────────────────────────

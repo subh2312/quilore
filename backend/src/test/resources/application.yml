@@ -13,6 +13,15 @@ spring:
   flyway:
     enabled: false
 
+quilore:
+  security:
+    jwt-secret: test-only-jwt-secret-must-be-32chars
+    jwt-issuer: quilore-test
+    jwt-audience: quilore-api-test
+    # 32 zero bytes — allowed only because allow-insecure-defaults is true in tests
+    data-encryption-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    allow-insecure-defaults: true
+
 management:
   endpoints:
     web:

@@ -4,6 +4,22 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Completed B1 — JWT bearer auth wired into Spring Security with JPA users/refresh sessions and executable bearer-token tests.
+- **Why:** Merge blocker B1: issued JWTs must establish SecurityContext principal/roles.
+- **How:** oauth2-resource-server JwtDecoder/Encoder (iss/aud/exp/HS256); hashed refresh_sessions; fail-closed secret validator; JwtBearerAuthIntegrationTest.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Starting B2 — enforce object-level authorization for every user-owned resource.
+- **Why:** Merge blocker B2: routes accepted arbitrary userId ownership.
+- **How:** Derive identity from CurrentUser/principal; reject cross-user access; add MockMvc ownership tests.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Starting B1 — integrate real JWT bearer authentication with Spring Security (principal, roles, fail-closed secrets, refresh persistence).
 - **Why:** Merge blocker B1: issued JWTs are not wired into SecurityContext.
 - **How:** OAuth2 resource-server JWT decoder + filter chain; issuer/audience validation; JPA users/refresh sessions; executable auth tests.
@@ -15,6 +31,7 @@
 - **What:** Phase 0 PR #5 remediation — created `docs/pr-5-remediation.md` with B1–B7/H1–H5 TODO tracker and corrected feature classification matrix.
 - **Why:** Review requested changes before merge to `dev`; freeze scope and honest status before coding blockers.
 - **How:** Tracked findings per remediation plan; classified features as production-ready / scaffold / partial / deferred; no product feature additions.
+
 
 - **Date:** 2026-08-11
 - **Tool:** cursor
