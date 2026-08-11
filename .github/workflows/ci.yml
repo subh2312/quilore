@@ -103,6 +103,9 @@ jobs:
       - name: Validate secret rotation scripts
         run: bash deploy/tests/test_secret_rotation.sh
 
+      - name: Validate Cloudflare Tunnel loopback overlay
+        run: bash deploy/tests/test_tunnel_overlay.sh
+
   # ─── Docker image build (no publish on PRs) ──────────────
   docker-build:
     name: Docker Image Build

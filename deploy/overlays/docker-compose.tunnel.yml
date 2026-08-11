@@ -1,0 +1,34 @@
+# VPS / Cloudflare Tunnel overlay (B7)
+# Base compose already binds services to 127.0.0.1. This overlay enforces
+# fail-closed secrets and optionally runs cloudflared (profile: tunnel).
+# Do NOT require host 80/443 or Caddy for this path.
+#
+# Usage (from repo root):
+#   JWT_SECRET=... DATA_ENCRYPTION_KEY=... docker compose \
+#     -f docker-compose.yml \
+#     -f deploy/overlays/docker-compose.tunnel.yml \
+#     up -d
+#
+# With cloudflared sidecar (credentials outside git):
+#   CLOUDFLARED_CONFIG=/secure/config.yml CLOUDFLARED_CREDS_DIR=/secure/creds \
+#     docker compose -f docker-compose.yml -f deploy/overlays/docker-compose.tunnel.yml \
+#     --profile tunnel up -d
+
+services:
+  backend:
+    environment:
+      QUILORE_ALLOW_INSECURE_DEFAULTS: "false"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for tunnel/staging/prod}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?DATA_ENCRYPTION_KEY is required for tunnel/staging/prod}
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.2.1
+    container_name: quilore-cloudflared
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ${CLOUDFLARED_CONFIG:-./deploy/overlays/cloudflared-config.example.yml}:/etc/cloudflared/config.yml:ro
+      - ${CLOUDFLARED_CREDS_DIR:-./deploy/secrets/cloudflared}:/etc/cloudflared/creds:ro
+    network_mode: host
+    profiles:
+      - tunnel

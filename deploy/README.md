@@ -25,13 +25,34 @@ Registry: `ghcr.io/<owner>/quilore-backend` and `ghcr.io/<owner>/quilore-ai-serv
 
 ## Apply on a VPS / local host
 
+**Primary path (Cloudflare Tunnel + loopback):**
+
 ```bash
 export BACKEND_IMAGE=ghcr.io/<owner>/quilore-backend:staging-<sha>
 export AI_SERVICE_IMAGE=ghcr.io/<owner>/quilore-ai-service:staging-<sha>
-bash deploy/scripts/apply-env.sh staging
+export JWT_SECRET='<32+ byte secret>'
+export DATA_ENCRYPTION_KEY='<base64 32 random bytes>'
+docker compose \
+  -f docker-compose.yml \
+  -f deploy/overlays/docker-compose.staging.yml \
+  -f deploy/overlays/docker-compose.tunnel.yml \
+  up -d --no-build
 ```
 
-Production:
+Point Cloudflare Tunnel ingress at `http://127.0.0.1:8080` (backend) and
+`http://127.0.0.1:8000` (AI). See `deploy/overlays/cloudflared-config.example.yml`.
+Host ports `80`/`443` and Caddy are **not** required for this path.
+
+Compose helper:
+
+```bash
+bash deploy/scripts/apply-env.sh staging
+bash deploy/tests/test_tunnel_overlay.sh
+```
+
+**Optional Caddy TLS path** (non-tunnel only): `deploy/overlays/docker-compose.tls.yml`.
+
+Production image pins:
 
 ```bash
 export BACKEND_IMAGE=ghcr.io/<owner>/quilore-backend:production

@@ -5,7 +5,7 @@ services:
     container_name: quilore-postgres
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-quilore}
       POSTGRES_USER: ${POSTGRES_USER:-quilore}
@@ -24,8 +24,8 @@ services:
     container_name: quilore-minio
     restart: unless-stopped
     ports:
-      - "9000:9000"   # API
-      - "9001:9001"   # Console
+      - "127.0.0.1:9000:9000"   # API (loopback — Cloudflare Tunnel / SSH only)
+      - "127.0.0.1:9001:9001"   # Console
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-quilore_minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-quilore_minio_secret}
@@ -46,7 +46,7 @@ services:
     container_name: quilore-backend
     restart: unless-stopped
     ports:
-      - "${SERVER_PORT:-8080}:8080"
+      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quilore}
@@ -67,7 +67,7 @@ services:
     container_name: quilore-ai-service
     restart: unless-stopped
     ports:
-      - "${AI_SERVICE_PORT:-8000}:8000"
+      - "127.0.0.1:${AI_SERVICE_PORT:-8000}:8000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-quilore}:${POSTGRES_PASSWORD:-quilore_dev_pass}@postgres:5432/${POSTGRES_DB:-quilore}
       GROQ_API_KEY: ${GROQ_API_KEY:-}

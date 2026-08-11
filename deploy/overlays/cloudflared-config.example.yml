@@ -1,0 +1,18 @@
+# Example Cloudflare Tunnel ingress for Quilore (B7).
+# Copy outside the git tree, replace hostname + credentials-file, then:
+#   CLOUDFLARED_CONFIG=/path/to/config.yml docker compose \
+#     -f docker-compose.yml -f deploy/overlays/docker-compose.tunnel.yml \
+#     --profile tunnel up -d
+#
+# Tunnel is the public TLS edge. Backend/AI remain on 127.0.0.1 only.
+# Caddy / host 80/443 are NOT required for this deployment path.
+
+tunnel: REPLACE_WITH_TUNNEL_ID
+credentials-file: /etc/cloudflared/creds/credentials.json
+
+ingress:
+  - hostname: quilore.example.com
+    service: http://127.0.0.1:8080
+  - hostname: quilore-ai.example.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404

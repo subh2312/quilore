@@ -1,11 +1,13 @@
-# TLS termination overlay (Story 15.2) — external traffic enters via Caddy HTTPS.
+# TLS termination overlay — OPTIONAL non-tunnel path (Story 15.2).
+# The primary VPS deployment uses Cloudflare Tunnel + loopback
+# (see docker-compose.tunnel.yml). Use this overlay only when you
+# intentionally terminate TLS on-host with Caddy (requires public 80/443).
+#
 # Usage (from repo root):
 #   QUILORE_DOMAIN=app.example.com docker compose \
 #     -f docker-compose.yml \
 #     -f deploy/overlays/docker-compose.tls.yml \
 #     up -d
-#
-# Prefer publishing only 80/443 externally; keep backend/AI ports firewalled in production.
 
 services:
   caddy:
@@ -18,7 +20,7 @@ services:
     environment:
       QUILORE_DOMAIN: ${QUILORE_DOMAIN:-localhost}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/overlays/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
