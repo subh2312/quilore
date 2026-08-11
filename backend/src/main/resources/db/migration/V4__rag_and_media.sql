@@ -16,9 +16,6 @@ CREATE INDEX IF NOT EXISTS idx_rag_chunks_embedding_hnsw
 CREATE INDEX IF NOT EXISTS idx_rag_chunks_metadata_gin
     ON rag_chunks USING gin (metadata jsonb_path_ops);
 
-CREATE INDEX IF NOT EXISTS idx_rag_chunks_content_trgm
-    ON rag_chunks USING gin (content gin_trgm_ops);
-
 CREATE TABLE IF NOT EXISTS media_objects (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID REFERENCES users(id) ON DELETE SET NULL,

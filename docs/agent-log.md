@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Implemented nutrition engines (IFCT resolve, macros/micros/RDA, shortfall flags, manual meal calc, training insights), pose/ego-lift kinematics, exercise mapping, hybrid RAG search, pull-push sync, and MinIO/pgvector schema.
+- **Why:** Remaining ordered Plane backlog stories spanning nutrition, form-check, sync, and infra data plane. Plane MCP unavailable; criteria from `docs/quilore-plane-backlog.md`.
+- **How:** Spring Boot nutrition/sync/media services with tests; FastAPI pose/exercise/RAG modules with pytest; Flyway V4 for `rag_chunks` + `media_objects`.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Implemented Stories 14.4, 14.3, 11.3, 11.1, 10.3, 10.2, 9.1, 1.2, 1.1 — exercise content, prompt versions, plans/quotas, async AI notifications, meal reminders, body metrics, profiles, and auth/JWT sessions.
 - **Why:** Next ordered Plane backlog IDs after security/observability. Plane MCP unavailable; criteria from `docs/quilore-plane-backlog.md`.
 - **How:** Added Spring Boot domain services + REST controllers with MockMvc/unit coverage; Flyway V3 schema for Postgres; in-memory stores for tests (Flyway off on H2). Auth uses BCrypt + HMAC JWT with failed-attempt rate limiting.
