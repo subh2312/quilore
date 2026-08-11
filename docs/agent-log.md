@@ -4,6 +4,22 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Starting B1 — integrate real JWT bearer authentication with Spring Security (principal, roles, fail-closed secrets, refresh persistence).
+- **Why:** Merge blocker B1: issued JWTs are not wired into SecurityContext.
+- **How:** OAuth2 resource-server JWT decoder + filter chain; issuer/audience validation; JPA users/refresh sessions; executable auth tests.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Phase 0 PR #5 remediation — created `docs/pr-5-remediation.md` with B1–B7/H1–H5 TODO tracker and corrected feature classification matrix.
+- **Why:** Review requested changes before merge to `dev`; freeze scope and honest status before coding blockers.
+- **How:** Tracked findings per remediation plan; classified features as production-ready / scaffold / partial / deferred; no product feature additions.
+
+- **Date:** 2026-08-11
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Fixed CI Deploy Tooling failure in secret rotation workspace-path guard.
 - **Why:** Guard only matched `/workspace`, so GitHub Actions (`/home/runner/work/...`) incorrectly allowed writing secrets into the checkout.
 - **How:** Resolve repo root from the script location and refuse any `--out` path under that tree.
