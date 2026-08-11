@@ -8,11 +8,13 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
 from app.config import settings
+from app.exercises.router import router as exercises_router
 from app.observability.logging import configure_logging, get_logger, job_trace
 from app.observability.middleware import (
     ObservabilityMiddleware,
     refresh_provider_health_metrics,
 )
+from app.pose.router import router as pose_router
 from app.providers.router import router as providers_router
 
 configure_logging()
@@ -45,6 +47,8 @@ app = FastAPI(
 
 app.add_middleware(ObservabilityMiddleware)
 app.include_router(providers_router, prefix="/ai", tags=["AI Providers"])
+app.include_router(pose_router, prefix="/ai/pose", tags=["Pose"])
+app.include_router(exercises_router, prefix="/ai/exercises", tags=["Exercises"])
 
 
 @app.get("/health")
