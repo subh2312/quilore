@@ -13,7 +13,10 @@ Build a release APK that talks to your Pi/backend over LAN (no Play Store requir
 Create `client/.env` (never commit secrets):
 
 ```bash
-EXPO_PUBLIC_API_URL=http://192.168.1.100:8080
+# LAN UAT (same Wi-Fi as Pi; requires backend bound beyond loopback):
+# EXPO_PUBLIC_API_URL=http://192.168.0.10:8080
+# Cloudflare Tunnel UAT (preferred — see deploy/uat-pi.md):
+EXPO_PUBLIC_API_URL=https://quilore.sm4devlabs.dpdns.org
 # Optional crash reporting:
 # EXPO_PUBLIC_SENTRY_DSN=https://...
 ```
