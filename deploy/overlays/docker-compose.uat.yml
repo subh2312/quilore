@@ -20,7 +20,7 @@
 services:
   # Soft caps so Quilore coexists with Home Assistant + Hermes on ~4GB Pi RAM.
   postgres:
-    mem_limit: 512m
+    mem_limit: 768m
 
   minio:
     mem_limit: 256m
