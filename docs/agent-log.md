@@ -6,7 +6,11 @@
 - **PR:** (pending) cursor → dev — NIM + Spring AI gateway
 - **What:** NIM client, live FastAPI invoke (heuristic fallback, no 503 stub), Spring AiGatewayClient, coach/workout/nutrition AI endpoints, session summary + V8 migration, UAT_MOCK_RECEIPT billing flag, deploy/uat-pi.md.
 - **Why:** Remaining 12 stories Wave 1A — unblock live AI and gym UAT backend per plan.
+<<<<<<< HEAD
 - **How:** OpenAI-compatible NIM adapter; router normalized envelopes; Spring validates before persistence; pytest 29 passed; `./gradlew test` BUILD SUCCESSFUL (isolated GRADLE_USER_HOME).
+=======
+- **How:** OpenAI-compatible NIM adapter; router normalized envelopes; Spring validates before persistence; pytest 29 passed; gradlew compile + integration tests.
+>>>>>>> origin/cursor
 
 - **Date:** 2026-08-12
 - **Tool:** cursor

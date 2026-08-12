@@ -10,7 +10,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+<<<<<<< HEAD
 import java.util.List;
+=======
+>>>>>>> origin/cursor
 import java.util.Map;
 import java.util.UUID;
 
@@ -20,6 +23,7 @@ public class WorkoutController {
 
     private final AiGatewayClient aiGatewayClient;
     private final WorkoutSessionService sessionService;
+<<<<<<< HEAD
     private final SessionSummaryService sessionSummaryService;
 
     public WorkoutController(
@@ -30,11 +34,18 @@ public class WorkoutController {
         this.aiGatewayClient = aiGatewayClient;
         this.sessionService = sessionService;
         this.sessionSummaryService = sessionSummaryService;
+=======
+
+    public WorkoutController(AiGatewayClient aiGatewayClient, WorkoutSessionService sessionService) {
+        this.aiGatewayClient = aiGatewayClient;
+        this.sessionService = sessionService;
+>>>>>>> origin/cursor
     }
 
     @PostMapping("/ocr-map")
     public ResponseEntity<?> ocrMap(@RequestBody Map<String, String> body) {
         UUID userId = CurrentUser.requireUserId();
+<<<<<<< HEAD
         return ocrMapForUser(userId, body);
     }
 
@@ -59,6 +70,17 @@ public class WorkoutController {
         long duration = body.get("durationMinutes") instanceof Number n ? n.longValue() : 0L;
         String startedAt = String.valueOf(body.getOrDefault("startedAt", ""));
         return ResponseEntity.ok(sessionSummaryService.summarize(userId, exercises, duration, startedAt));
+=======
+        String text = body.getOrDefault("text", "");
+        String source = body.getOrDefault("source", "on_device_ocr");
+        Map<String, Object> mapped = aiGatewayClient.ocrMapToSchema(text, source);
+        return ResponseEntity.ok(Map.of(
+                "userId", userId.toString(),
+                "envelope", mapped,
+                "editable", true,
+                "userConfirmationRequired", true
+        ));
+>>>>>>> origin/cursor
     }
 
     @PostMapping("/sessions")
@@ -91,6 +113,7 @@ public class WorkoutController {
         UUID userId = CurrentUser.requireUserId();
         return ResponseEntity.ok(sessionService.getSession(userId, sessionId));
     }
+<<<<<<< HEAD
 
     private Map<String, Object> flattenOcrResponse(UUID userId, String text, Map<String, Object> mapped) {
         @SuppressWarnings("unchecked")
@@ -105,4 +128,6 @@ public class WorkoutController {
                 "userConfirmationRequired", true
         );
     }
+=======
+>>>>>>> origin/cursor
 }

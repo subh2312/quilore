@@ -14,6 +14,7 @@ public class CoachController {
     @PostMapping("/chat")
     public ResponseEntity<?> chat(@RequestBody Map<String, Object> body) {
         UUID userId = CurrentUser.requireUserId();
+<<<<<<< HEAD
         return chatForUser(userId, body);
     }
 
@@ -49,6 +50,17 @@ public class CoachController {
     private ResponseEntity<?> programForUser(UUID userId, Map<String, Object> body) {
         return ResponseEntity.ok(coachService.generateProgram(
                 userId,
+=======
+        return ResponseEntity.ok(Map.of("userId", userId.toString(), "envelope",
+                coachService.chat(userId, String.valueOf(body.getOrDefault("prompt", "")),
+                        Boolean.TRUE.equals(body.get("escalate"))),
+                "editable", true, "userConfirmationRequired", true));
+    }
+    @PostMapping("/program")
+    public ResponseEntity<?> program(@RequestBody Map<String, Object> body) {
+        UUID userId = CurrentUser.requireUserId();
+        return ResponseEntity.ok(coachService.generateProgram(userId,
+>>>>>>> origin/cursor
                 String.valueOf(body.getOrDefault("prompt", "Generate a program")),
                 body.get("idempotencyKey") == null ? null : String.valueOf(body.get("idempotencyKey"))));
     }
