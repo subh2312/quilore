@@ -1,5 +1,21 @@
 # Agent Log
 
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Completed F1/F2 — atomic quota consume under concurrency; deferred media no longer returns constructed URLs.
+- **Why:** Final merge blockers: quota race could exceed limits; deferred MinIO responses looked like real object URLs.
+- **How:** Native insert-if-absent + JPQL conditional increment; DeferredMediaUrlTest + QuotaConcurrencyIntegrationTest (40 threads / limit 5).
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/5
+- **What:** Starting F1/F2 merge-blocker fixes — atomic quota consumption and deferred media URL suppression.
+- **Why:** Concurrent consumeQuota can over-allocate; deferred MinIO registration still returned constructed fake URLs.
+- **How:** Conditional JPQL increment (`used_count < limit`); deferred media returns `url: null` + `uploadAvailable: false`; concurrency + media tests.
+
 - **Date:** 2026-08-11
 - **Tool:** cursor
 - **Branch:** cursor

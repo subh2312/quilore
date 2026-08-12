@@ -21,6 +21,8 @@
 | H3 | High | DONE | Covered by B2/B3 |
 | H4 | High | DONE | Nutrition/pose disclaimers + provenance; non-medical labels |
 | H5 | High | DONE | Feature matrix keeps MediaPipe/RAG/IFCT/push/Maestro partial |
+| F1 | Blocker | DONE | Atomic insert-if-absent + conditional increment; QuotaConcurrencyIntegrationTest |
+| F2 | Blocker | DONE | Deferred media returns `url: null`, `uploadAvailable: false`; DeferredMediaUrlTest |
 
 ## Feature classification (corrected)
 
@@ -34,7 +36,7 @@
 | Field encryption | production-ready (injuries field) | Fail-closed keys; injuries encrypted at rest |
 | AI invoke / live inference | deferred / unavailable | HTTP 503 explicit deferred envelope (Path B) |
 | Postgres+pgvector migrations | proven (local PG); Testcontainers when Docker available | `prove-pgvector-migrations.sh` evidence |
-| MinIO media | partial / deferred | DB metadata persisted; live upload deferred (`minio.enabled=false`) |
+| MinIO media | partial / deferred | Metadata only; deferred responses must not expose usable URLs (F2) |
 | VPS deploy path | production-ready (ops path) | Loopback + Cloudflare Tunnel; Caddy optional |
 | MediaPipe on-device | partial | Landmark contract + server heuristics only |
 | Live RAG / pgvector retrieval | partial | In-memory hybrid ranker + SQL reference |
@@ -67,6 +69,8 @@
 | 2026-08-11 | B7 | `bash deploy/tests/test_tunnel_overlay.sh` PASS; loopback host_ip + no Caddy on tunnel path |
 | 2026-08-11 | H1/H4/H5 | AuthValidationTest PASS; pose disclaimer test PASS; partial labels retained in matrix |
 | 2026-08-11 | Final | Local full suite PASS; CI green https://github.com/subh2312/quilore/actions/runs/31519723247 on `1b32dfe` |
+| 2026-08-12 | F1 | `QuotaConcurrencyIntegrationTest` — 40 concurrent consumes, limit 5; successes=5, stored used_count=5, rest 429 |
+| 2026-08-12 | F2 | `DeferredMediaUrlTest` + PersistenceRestart — deferred register/metadata `url: null`, `uploadAvailable: false` |
 
 ## B3 notes
 

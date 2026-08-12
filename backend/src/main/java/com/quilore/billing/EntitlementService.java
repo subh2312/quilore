@@ -154,22 +154,25 @@ public class EntitlementService {
         Plan plan = toPlan(resolvePlan(userId));
         int limit = plan.monthlyQuotas().getOrDefault(featureKey, 0);
         LocalDate periodStart = LocalDate.now().withDayOfMonth(1);
-        UsageCounterEntity counter = usageCounterRepository
-                .findByUserIdAndFeatureKeyAndPeriodStart(userId, featureKey, periodStart)
-                .orElseGet(() -> {
-                    UsageCounterEntity created = new UsageCounterEntity();
-                    created.setUserId(userId);
-                    created.setFeatureKey(featureKey);
-                    created.setPeriodStart(periodStart);
-                    created.setUsedCount(0);
-                    return created;
-                });
-        int used = counter.getUsedCount() + 1;
-        if (used > limit) {
+
+        if (limit <= 0) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Quota exceeded");
         }
-        counter.setUsedCount(used);
-        usageCounterRepository.save(counter);
+
+        usageCounterRepository.insertIfAbsent(UUID.randomUUID(), userId, featureKey, periodStart);
+
+        int updated = usageCounterRepository.tryIncrementIfUnderLimit(
+                userId, featureKey, periodStart, limit);
+        if (updated == 0) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Quota exceeded");
+        }
+
+        int used = usageCounterRepository
+                .findByUserIdAndFeatureKeyAndPeriodStart(userId, featureKey, periodStart)
+                .map(UsageCounterEntity::getUsedCount)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR, "Usage counter missing after increment"));
+
         return Map.of(
                 "featureKey", featureKey,
                 "used", used,
