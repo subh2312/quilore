@@ -2,6 +2,7 @@
 
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
 from app.nutrition.food_quality import food_quality_feedback
 from app.ocr.mapper import map_ocr_text_to_schema
@@ -29,7 +30,8 @@ def test_ocr_http_endpoint():
     assert res.json()["exercises"][0]["name"].lower().startswith("bench")
 
 
-def test_queue_idempotent_enqueue_and_status():
+def test_queue_idempotent_enqueue_and_status(monkeypatch):
+    monkeypatch.setattr(settings, "internal_api_token", "test-internal-token")
     a = client.post(
         "/ai/queue/jobs",
         json={"task_type": "program_generation", "payload": {}, "idempotency_key": "k1"},
@@ -41,7 +43,12 @@ def test_queue_idempotent_enqueue_and_status():
     assert a.status_code == 200
     assert a.json()["job"]["id"] == b.json()["job"]["id"]
     job_id = a.json()["job"]["id"]
-    client.post("/ai/queue/jobs/process-next")
+    unauthorized = client.post("/ai/queue/jobs/process-next")
+    assert unauthorized.status_code == 401
+    client.post(
+        "/ai/queue/jobs/process-next",
+        headers={"X-Internal-Token": "test-internal-token"},
+    )
     got = client.get(f"/ai/queue/jobs/{job_id}")
     assert got.json()["status"] == "completed"
 

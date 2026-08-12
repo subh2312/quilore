@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.queue.job_queue import queue
+from app.security.internal_auth import require_internal_token
 
 router = APIRouter()
 
@@ -26,7 +27,7 @@ async def get_job(job_id: str):
     return queue.to_dict(job)
 
 
-@router.post("/jobs/process-next")
+@router.post("/jobs/process-next", dependencies=[Depends(require_internal_token)])
 async def process_next():
     job = queue.process_next()
     if job is None:

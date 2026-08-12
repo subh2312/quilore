@@ -1,6 +1,14 @@
 # Agent Log
 
 - **Date:** 2026-08-12
+- **Tool:** copilot
+- **Branch:** copilot
+- **PR:** (pending) copilot → dev — secure queue process-next route
+- **What:** Added internal API token guard for `POST /ai/queue/jobs/process-next`; config/env wiring and security tests.
+- **Why:** Agentic security review (MEDIUM): unauthenticated callers could mutate shared queue state by triggering job processing.
+- **How:** `require_internal_token` dependency validates `X-Internal-Token` or Bearer token against `AI_SERVICE_INTERNAL_TOKEN`; fail-closed when unset; pytest coverage for 401/503 paths.
+
+- **Date:** 2026-08-12
 - **Tool:** cursor (lead architect)
 - **Branch:** cursor
 - **PR:** (pending) cursor → dev — NIM adapter + Spring AI gateway
