@@ -66,6 +66,20 @@ function pendingConsentsKey(userId: string) {
   return `${PENDING_CONSENTS_KEY}_${userId}`;
 }
 
+/** Serialize pending-consent read-modify-write ops per user to avoid parallel enqueue races. */
+const pendingConsentOps = new Map<string, Promise<unknown>>();
+
+function runPendingConsentOp<T>(userId: string, op: () => Promise<T>): Promise<T> {
+  const tail = pendingConsentOps.get(userId) ?? Promise.resolve();
+  const run = tail.catch(() => undefined).then(op);
+  pendingConsentOps.set(userId, run);
+  return run.finally(() => {
+    if (pendingConsentOps.get(userId) === run) {
+      pendingConsentOps.delete(userId);
+    }
+  });
+}
+
 export async function getOnboardingCompleteLocal(userId: string): Promise<boolean> {
   const raw = await secureGet(onboardingCompleteKey(userId));
   return raw === 'true';
@@ -110,15 +124,19 @@ export async function getPendingConsents(userId: string): Promise<PendingConsent
 }
 
 export async function enqueuePendingConsent(userId: string, item: PendingConsent) {
-  const existing = await getPendingConsents(userId);
-  const next = [...existing.filter((c) => c.consentType !== item.consentType), item];
-  await secureSet(pendingConsentsKey(userId), JSON.stringify(next));
+  return runPendingConsentOp(userId, async () => {
+    const existing = await getPendingConsents(userId);
+    const next = [...existing.filter((c) => c.consentType !== item.consentType), item];
+    await secureSet(pendingConsentsKey(userId), JSON.stringify(next));
+  });
 }
 
 export async function removePendingConsent(userId: string, consentType: string) {
-  const existing = await getPendingConsents(userId);
-  const next = existing.filter((c) => c.consentType !== consentType);
-  await secureSet(pendingConsentsKey(userId), next.length ? JSON.stringify(next) : null);
+  return runPendingConsentOp(userId, async () => {
+    const existing = await getPendingConsents(userId);
+    const next = existing.filter((c) => c.consentType !== consentType);
+    await secureSet(pendingConsentsKey(userId), next.length ? JSON.stringify(next) : null);
+  });
 }
 
 export async function clearPendingConsents(userId: string) {
