@@ -11,14 +11,10 @@ from app.config import settings
 from app.exercises.router import router as exercises_router
 from app.nutrition.router import router as nutrition_router
 from app.observability.logging import configure_logging, get_logger, job_trace
-<<<<<<< HEAD
 from app.observability.middleware import (
     ObservabilityMiddleware,
     refresh_provider_health_metrics,
 )
-=======
-from app.observability.middleware import ObservabilityMiddleware, refresh_provider_health_metrics
->>>>>>> origin/cursor
 from app.ocr.router import router as ocr_router
 from app.pose.router import router as pose_router
 from app.prompts.router import router as prompts_router
@@ -33,16 +29,13 @@ log = get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Application startup / shutdown lifecycle."""
     with job_trace("ai-service-startup"):
-<<<<<<< HEAD
         log.info(
             "service_starting",
             port=settings.port,
             nim_configured=nim_client.nim_configured(),
         )
-=======
-        log.info("service_starting", port=settings.port, nim_configured=nim_client.nim_configured())
->>>>>>> origin/cursor
         if nim_client.nim_configured():
             nim_client.verify_models_at_startup()
         refresh_provider_health_metrics()
@@ -50,7 +43,13 @@ async def lifespan(app: FastAPI):
     log.info("service_stopping")
 
 
-app = FastAPI(title="Quilore AI Service", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Quilore AI Service",
+    description="Stateless AI orchestration — provider routing, OCR cleanup, prompt assembly, "
+    "embeddings, and food-image pipeline.",
+    version="0.1.0",
+    lifespan=lifespan,
+)
 app.add_middleware(ObservabilityMiddleware)
 app.include_router(providers_router, prefix="/ai", tags=["AI Providers"])
 app.include_router(pose_router, prefix="/ai/pose", tags=["Pose"])
@@ -63,19 +62,16 @@ app.include_router(prompts_router, prefix="/ai/prompts", tags=["Prompts"])
 
 @app.get("/health")
 async def health():
+    """Health check endpoint."""
     refresh_provider_health_metrics()
     return {
         "status": "UP",
         "service": "quilore-ai-service",
         "timestamp": datetime.now(UTC).isoformat(),
-<<<<<<< HEAD
         "circuits": {
             p: get_breaker(p).state.value
             for p in ("groq", "openrouter", "huggingface", "nvidia_nim")
         },
-=======
-        "circuits": {p: get_breaker(p).state.value for p in ("groq", "openrouter", "huggingface", "nvidia_nim")},
->>>>>>> origin/cursor
     }
 
 
