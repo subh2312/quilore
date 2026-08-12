@@ -2,6 +2,7 @@ package com.quilore.billing;
 
 import com.quilore.security.CurrentUser;
 import com.quilore.security.PermissionAuditService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -21,10 +22,16 @@ public class EntitlementController {
 
     private final EntitlementService service;
     private final PermissionAuditService permissionAuditService;
+    private final boolean uatMockReceipt;
 
-    public EntitlementController(EntitlementService service, PermissionAuditService permissionAuditService) {
+    public EntitlementController(
+            EntitlementService service,
+            PermissionAuditService permissionAuditService,
+            @Value("${quilore.billing.uat-mock-receipt:false}") boolean uatMockReceipt
+    ) {
         this.service = service;
         this.permissionAuditService = permissionAuditService;
+        this.uatMockReceipt = uatMockReceipt;
     }
 
     @GetMapping("/plans")
@@ -58,6 +65,69 @@ public class EntitlementController {
                 "target=" + userId + " plan=" + body.get("planCode")
         );
         return ResponseEntity.ok(service.entitlementState(userId));
+    }
+
+    @PostMapping("/billing/{userId}/purchase")
+    public ResponseEntity<?> purchase(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        String productId = String.valueOf(body.getOrDefault("productId", "premium_monthly"));
+        String store = String.valueOf(body.getOrDefault("store", "app_store"));
+        String tx = String.valueOf(body.getOrDefault("transactionId", UUID.randomUUID().toString()));
+        String receipt = body.get("receipt") == null ? "" : String.valueOf(body.get("receipt"));
+        if (tx.isBlank() && receipt.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("activated", false, "reason", "missing_transaction"));
+        }
+        if (uatMockReceipt && "UAT_MOCK_RECEIPT".equals(receipt)) {
+            service.assignPlan(owner, "PREMIUM");
+            return ResponseEntity.ok(Map.of(
+                    "activated", true,
+                    "store", store,
+                    "productId", productId,
+                    "transactionId", tx.isBlank() ? "uat-mock-" + UUID.randomUUID() : tx,
+                    "mockUat", true,
+                    "entitlements", service.entitlementState(owner)
+            ));
+        }
+        if (tx.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("activated", false, "reason", "missing_transaction"));
+        }
+        service.assignPlan(owner, "PREMIUM");
+        return ResponseEntity.ok(Map.of(
+                "activated", true,
+                "store", store,
+                "productId", productId,
+                "transactionId", tx,
+                "entitlements", service.entitlementState(owner)
+        ));
+    }
+
+    @PostMapping("/billing/{userId}/restore")
+    public ResponseEntity<?> restore(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        String tx = String.valueOf(body.getOrDefault("transactionId", ""));
+        String receipt = body.get("receipt") == null ? "" : String.valueOf(body.get("receipt"));
+        if (uatMockReceipt && "UAT_MOCK_RECEIPT".equals(receipt)) {
+            service.assignPlan(owner, "PREMIUM");
+            return ResponseEntity.ok(Map.of(
+                    "restored", true,
+                    "transactionId", tx.isBlank() ? "uat-mock-restore" : tx,
+                    "mockUat", true,
+                    "entitlements", service.entitlementState(owner)
+            ));
+        }
+        if (tx.isBlank()) {
+            return ResponseEntity.ok(Map.of(
+                    "restored", false,
+                    "reason", "no_prior_receipt",
+                    "entitlements", service.entitlementState(owner)
+            ));
+        }
+        service.assignPlan(owner, "PREMIUM");
+        return ResponseEntity.ok(Map.of(
+                "restored", true,
+                "transactionId", tx,
+                "entitlements", service.entitlementState(owner)
+        ));
     }
 
     @PostMapping("/quotas/{userId}/consume")

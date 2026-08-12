@@ -3,6 +3,14 @@
 - **Date:** 2026-08-12
 - **Tool:** cursor
 - **Branch:** cursor
+- **PR:** (pending) cursor → dev — NIM + Spring AI gateway
+- **What:** NIM client, live FastAPI invoke (heuristic fallback, no 503 stub), Spring AiGatewayClient, coach/workout/nutrition AI endpoints, session summary + V8 migration, UAT_MOCK_RECEIPT billing flag, deploy/uat-pi.md.
+- **Why:** Remaining 12 stories Wave 1A — unblock live AI and gym UAT backend per plan.
+- **How:** OpenAI-compatible NIM adapter; router normalized envelopes; Spring validates before persistence; pytest 29 passed; gradlew compile + integration tests.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/5
 - **What:** Completed F1/F2 — atomic quota consume under concurrency; deferred media no longer returns constructed URLs.
 - **Why:** Final merge blockers: quota race could exceed limits; deferred MinIO responses looked like real object URLs.
