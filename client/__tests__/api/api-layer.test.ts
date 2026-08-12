@@ -101,6 +101,71 @@ describe("Auth register and refresh", () => {
     expect(session).toBeNull();
     expect(await getStoredAccessToken()).toBeNull();
   });
+
+  it("clears stored session on logout even when refresh rotated tokens during logout", async () => {
+    await persistSession({
+      accessToken: "old-access",
+      refreshToken: "old-refresh",
+      userId: "11111111-1111-1111-1111-111111111111",
+    });
+    global.fetch = jest.fn().mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/auth/logout")) {
+        await persistSession({
+          accessToken: "rotated-access",
+          refreshToken: "rotated-refresh",
+          userId: "11111111-1111-1111-1111-111111111111",
+        });
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          user: { id: "11111111-1111-1111-1111-111111111111", email: "a@b.com", displayName: "Alex", role: "USER" },
+          accessToken: "rotated-access",
+          refreshToken: "rotated-refresh",
+          expiresAt: "2026-08-13T00:00:00Z",
+        }),
+      };
+    });
+
+    const { logout } = await import("../../lib/api/auth");
+    await logout("old-refresh");
+
+    expect(await getStoredAccessToken()).toBeNull();
+  });
+
+  it("preserves a new login session when logout finishes after re-authentication", async () => {
+    await persistSession({
+      accessToken: "old-access",
+      refreshToken: "old-refresh",
+      userId: "11111111-1111-1111-1111-111111111111",
+    });
+    global.fetch = jest.fn().mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/auth/logout")) {
+        return new Promise((resolve) => {
+          setTimeout(() => resolve({ ok: true, status: 200, json: async () => ({}) }), 20);
+        });
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          user: { id: "22222222-2222-2222-2222-222222222222", email: "b@c.com", displayName: "Sam", role: "USER" },
+          accessToken: "new-access",
+          refreshToken: "new-refresh",
+          expiresAt: "2026-08-13T00:00:00Z",
+        }),
+      };
+    });
+
+    const { logout, login } = await import("../../lib/api/auth");
+    const logoutPromise = logout("old-refresh");
+    await login("b@c.com", "password123");
+    await logoutPromise;
+
+    expect(await getStoredAccessToken()).toBe("new-access");
+  });
 });
 
 describe("Coach chat fallback", () => {

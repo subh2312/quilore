@@ -2,6 +2,13 @@ import { apiRequest, ApiClientError } from "./client";
 import { clearStoredSession, getStoredRefreshToken, persistSession } from "./authStorage";
 import type { AuthSession, AuthUser } from "./types";
 
+/** Set when login/register establishes a new session during an in-flight logout. */
+let newSessionEstablishedDuringLogout = false;
+
+function markNewSessionEstablished() {
+  newSessionEstablishedDuringLogout = true;
+}
+
 export function isSupportOrAdmin(role: string): boolean {
   return role === "SUPPORT" || role === "ADMIN";
 }
@@ -12,6 +19,7 @@ export async function fetchMe(): Promise<AuthUser> {
 
 export async function login(email: string, password: string): Promise<AuthSession> {
   const session = await apiRequest<AuthSession>("/api/auth/login", { method: "POST", body: { email, password }, auth: false });
+  markNewSessionEstablished();
   await persistSession({ accessToken: session.accessToken, refreshToken: session.refreshToken, userId: session.user.id });
   return session;
 }
@@ -22,6 +30,7 @@ export async function register(email: string, password: string, displayName: str
     body: { email, password, displayName },
     auth: false,
   });
+  markNewSessionEstablished();
   await persistSession({ accessToken: session.accessToken, refreshToken: session.refreshToken, userId: session.user.id });
   return session;
 }
@@ -47,12 +56,13 @@ export async function refreshSession(): Promise<AuthSession | null> {
 }
 
 export async function logout(refreshToken: string) {
+  newSessionEstablishedDuringLogout = false;
   try {
     await apiRequest("/api/auth/logout", { method: "POST", body: { refreshToken } });
   } finally {
-    const current = await getStoredRefreshToken();
-    if (current === refreshToken) {
+    if (!newSessionEstablishedDuringLogout) {
       await clearStoredSession();
     }
+    newSessionEstablishedDuringLogout = false;
   }
 }
