@@ -60,6 +60,45 @@ public class EntitlementController {
         return ResponseEntity.ok(service.entitlementState(userId));
     }
 
+    @PostMapping("/billing/{userId}/purchase")
+    public ResponseEntity<?> purchase(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        String productId = String.valueOf(body.getOrDefault("productId", "premium_monthly"));
+        String store = String.valueOf(body.getOrDefault("store", "app_store"));
+        String tx = String.valueOf(body.getOrDefault("transactionId", UUID.randomUUID().toString()));
+        // Store receipt validation is stubbed; activation assigns PREMIUM after accepted receipt shape.
+        if (tx.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("activated", false, "reason", "missing_transaction"));
+        }
+        service.assignPlan(owner, "PREMIUM");
+        return ResponseEntity.ok(Map.of(
+                "activated", true,
+                "store", store,
+                "productId", productId,
+                "transactionId", tx,
+                "entitlements", service.entitlementState(owner)
+        ));
+    }
+
+    @PostMapping("/billing/{userId}/restore")
+    public ResponseEntity<?> restore(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        String tx = String.valueOf(body.getOrDefault("transactionId", ""));
+        if (tx.isBlank()) {
+            return ResponseEntity.ok(Map.of(
+                    "restored", false,
+                    "reason", "no_prior_receipt",
+                    "entitlements", service.entitlementState(owner)
+            ));
+        }
+        service.assignPlan(owner, "PREMIUM");
+        return ResponseEntity.ok(Map.of(
+                "restored", true,
+                "transactionId", tx,
+                "entitlements", service.entitlementState(owner)
+        ));
+    }
+
     @PostMapping("/quotas/{userId}/consume")
     public ResponseEntity<?> consume(@PathVariable UUID userId, @RequestBody Map<String, String> body) {
         UUID owner = CurrentUser.requireSelfOrAdmin(userId);

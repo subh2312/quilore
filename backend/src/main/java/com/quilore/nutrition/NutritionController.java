@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,6 +25,8 @@ public class NutritionController {
     private final IfctFoodResolutionService foodResolutionService;
     private final ManualMealNutritionService mealNutritionService;
     private final NutritionTrainingInsightService insightService;
+    private final MealLogService mealLogService;
+    private final MealTimingService mealTimingService;
 
     public NutritionController(
             IcmrRdaService rdaService,
@@ -31,7 +34,9 @@ public class NutritionController {
             MicronutrientFlagService flagService,
             IfctFoodResolutionService foodResolutionService,
             ManualMealNutritionService mealNutritionService,
-            NutritionTrainingInsightService insightService
+            NutritionTrainingInsightService insightService,
+            MealLogService mealLogService,
+            MealTimingService mealTimingService
     ) {
         this.rdaService = rdaService;
         this.macroTargetService = macroTargetService;
@@ -39,6 +44,8 @@ public class NutritionController {
         this.foodResolutionService = foodResolutionService;
         this.mealNutritionService = mealNutritionService;
         this.insightService = insightService;
+        this.mealLogService = mealLogService;
+        this.mealTimingService = mealTimingService;
     }
 
     @PostMapping("/targets/macros/{userId}")
@@ -144,4 +151,91 @@ public class NutritionController {
         );
         return ResponseEntity.ok(insights.stream().map(insightService::toMap).toList());
     }
+
+    @PostMapping("/meals/{userId}")
+    public ResponseEntity<?> saveMeal(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
+        var totals = mealNutritionService.calculate(items);
+        Map<String, Object> totalMap = Map.of(
+                "calories", totals.calories(),
+                "proteinG", totals.proteinG(),
+                "carbsG", totals.carbsG(),
+                "fatG", totals.fatG(),
+                "micros", totals.micros()
+        );
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> savedItems = (List<Map<String, Object>>) (List<?>) totals.items().stream().map(i -> Map.of(
+                "foodCode", i.foodCode(),
+                "foodName", i.foodName(),
+                "grams", i.grams(),
+                "calories", i.calories(),
+                "proteinG", i.proteinG(),
+                "carbsG", i.carbsG(),
+                "fatG", i.fatG()
+        )).toList();
+        var entry = mealLogService.save(
+                owner,
+                String.valueOf(body.getOrDefault("sourceType", "manual")),
+                String.valueOf(body.getOrDefault("mealType", "meal")),
+                body.get("notes") == null ? null : String.valueOf(body.get("notes")),
+                totalMap,
+                savedItems
+        );
+        return ResponseEntity.ok(mealLogService.toMap(entry));
+    }
+
+    @GetMapping("/meals/{userId}/daily")
+    public ResponseEntity<?> daily(
+            @PathVariable UUID userId,
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) Double targetCalories,
+            @RequestParam(required = false) Double targetProteinG,
+            @RequestParam(required = false) Double targetCarbsG,
+            @RequestParam(required = false) Double targetFatG
+    ) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        LocalDate day = date == null || date.isBlank() ? LocalDate.now() : LocalDate.parse(date);
+        Map<String, Double> targets = Map.of(
+                "calories", targetCalories == null ? 0.0 : targetCalories,
+                "proteinG", targetProteinG == null ? 0.0 : targetProteinG,
+                "carbsG", targetCarbsG == null ? 0.0 : targetCarbsG,
+                "fatG", targetFatG == null ? 0.0 : targetFatG
+        );
+        return ResponseEntity.ok(mealLogService.dailySnapshot(owner, day, targets));
+    }
+
+    @PostMapping("/meals/timing-check")
+    public ResponseEntity<?> timing(@RequestBody Map<String, Object> body) {
+        CurrentUser.requireAuthentication();
+        @SuppressWarnings("unchecked")
+        List<String> foods = (List<String>) body.getOrDefault("foods", List.of());
+        var flags = mealTimingService.evaluate(
+                foods,
+                String.valueOf(body.getOrDefault("mealType", "meal")),
+                ((Number) body.getOrDefault("hourOfDay", 12)).intValue()
+        );
+        return ResponseEntity.ok(flags.stream().map(mealTimingService::toMap).toList());
+    }
+
+    @GetMapping("/units/household")
+    public ResponseEntity<?> householdUnits() {
+        CurrentUser.requireAuthentication();
+        return ResponseEntity.ok(Map.of(
+                "version", "v1",
+                "units", Map.of(
+                        "roti", 40.0,
+                        "katori", 150.0,
+                        "bowl", 200.0,
+                        "cup", 240.0,
+                        "tbsp", 15.0,
+                        "tsp", 5.0,
+                        "piece", 50.0,
+                        "g", 1.0
+                ),
+                "note", "Unsupported units require user clarification rather than silent conversion."
+        ));
+    }
+
 }
