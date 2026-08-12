@@ -1,5 +1,6 @@
 """Quilore AI Orchestration Service — FastAPI application."""
 
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
@@ -18,12 +19,29 @@ from app.observability.middleware import (
 from app.ocr.router import router as ocr_router
 from app.pose.router import router as pose_router
 from app.prompts.router import router as prompts_router
+from app.providers import nim_client
 from app.providers.router import router as providers_router
 from app.queue.router import router as queue_router
 from app.resilience.provider_resilience import get_breaker
 
 configure_logging()
 log = get_logger()
+
+
+def _start_nim_probe() -> None:
+    def _log_background_failure(task: asyncio.Task[None]) -> None:
+        try:
+            exc = task.exception()
+        except asyncio.CancelledError:
+            return
+        if exc is not None:
+            log.warning("nim_models_verify_background_failed", reason=str(exc))
+
+    async def _probe() -> None:
+        await asyncio.to_thread(nim_client.verify_models_at_startup)
+
+    task = asyncio.create_task(_probe())
+    task.add_done_callback(_log_background_failure)
 
 
 @asynccontextmanager
@@ -33,10 +51,13 @@ async def lifespan(app: FastAPI):
         log.info(
             "service_starting",
             port=settings.port,
+            nim_configured=nim_client.nim_configured(),
             groq_configured=bool(settings.groq_api_key),
             openrouter_configured=bool(settings.openrouter_api_key),
             huggingface_configured=bool(settings.hf_api_token),
         )
+        if nim_client.nim_configured():
+            _start_nim_probe()
         refresh_provider_health_metrics()
     yield
     log.info("service_stopping")
@@ -68,7 +89,10 @@ async def health():
         "status": "UP",
         "service": "quilore-ai-service",
         "timestamp": datetime.now(UTC).isoformat(),
-        "circuits": {p: get_breaker(p).state.value for p in ("groq", "openrouter", "huggingface")},
+        "circuits": {
+            p: get_breaker(p).state.value
+            for p in ("groq", "openrouter", "huggingface", "nvidia_nim")
+        },
     }
 
 

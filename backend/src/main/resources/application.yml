@@ -70,6 +70,11 @@ quilore:
     jwt-audience: ${JWT_AUDIENCE:quilore-api}
     # Staging/prod MUST leave this false. Dev/test may set true only with explicit profile.
     allow-insecure-defaults: ${QUILORE_ALLOW_INSECURE_DEFAULTS:false}
+  ai:
+    service-url: ${AI_SERVICE_URL:http://localhost:8000}
+    connect-timeout-ms: 3000
+    read-timeout-ms: 30000
+    internal-api-token: ${AI_SERVICE_INTERNAL_TOKEN:}
   billing:
     # Staging/prod MUST leave false — mock receipts bypass store verification for UAT only.
     allow-mock-receipts: ${QUILORE_ALLOW_MOCK_RECEIPTS:false}

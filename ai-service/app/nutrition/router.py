@@ -1,9 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.nutrition.food_quality import food_quality_feedback
+from app.security.internal_auth import require_internal_token
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_internal_token)])
 
 
 class FoodQualityRequest(BaseModel):

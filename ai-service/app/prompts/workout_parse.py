@@ -22,7 +22,7 @@ def build_workout_parse_prompt(transcript: str) -> dict[str, str]:
     return {
         "system": WORKOUT_PARSE_SYSTEM,
         "user": WORKOUT_PARSE_USER_TEMPLATE.format(transcript=transcript.strip()),
-        "providerPriority": "groq->openrouter->huggingface",
+        "providerPriority": "nvidia_nim->groq->openrouter->huggingface",
         "responseSchema": "workout_parse_v1",
         "editable": "true",
     }

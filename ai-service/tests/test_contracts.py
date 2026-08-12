@@ -1,6 +1,7 @@
 """Contract tests for AI gateway routing and response normalization."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -30,6 +31,7 @@ def test_health_returns_ok():
     assert data["status"] == "UP"
     assert data["service"] == "quilore-ai-service"
     assert "timestamp" in data
+    assert "nvidia_nim" in data["circuits"]
 
 
 def test_provider_status_covers_full_fallback_matrix():
@@ -49,9 +51,9 @@ def test_route_task_graceful_degradation_without_keys():
     assert response.status_code == 200
     data = response.json()
     assert data["task"] == "chat"
+    assert data["fallback_chain"][0] == "nvidia_nim"
     assert data["selected_provider"] is None
-    assert data["fallback_chain"] == ["groq", "openrouter", "huggingface"]
-    assert "queued" in data["message"].lower() or "provider" in data["message"].lower()
+    assert "provider" in data["message"].lower() or "heuristic" in data["message"].lower()
 
 
 def test_route_all_task_types_return_contract():
@@ -65,36 +67,49 @@ def test_route_all_task_types_return_contract():
         assert "message" in data
 
 
-def test_invoke_returns_explicit_unavailable_deferred():
-    """B5 Path B: never fake successful inference; return 503 unavailable/deferred."""
+def test_invoke_returns_heuristic_envelope_without_keys(internal_auth_headers):
     response = client.post(
         "/ai/tasks/chat/invoke",
-        json={"input": {"prompt": "suggest a deload"}, "prefer_provider": None},
+        json={"input": {"prompt": "suggest a deload"}},
+        headers=internal_auth_headers,
     )
-    assert response.status_code == 503
-    data = response.json()["detail"]
+    assert response.status_code == 200
+    data = response.json()
     assert REQUIRED_ENVELOPE_FIELDS <= set(data.keys())
-    assert data["editable"] is True
-    assert data["user_confirmation_required"] is True
     assert data["degraded"] is True
-    assert data["task"] == "chat"
-    assert data["content"]["status"] == "unavailable"
-    assert data["content"]["reason"] == "deferred"
-    assert "accepted" not in data["content"]
+    assert "reply" in data["content"]
     NormalizedAIResponse.model_validate(data)
 
 
-def test_invoke_all_task_types_are_unavailable_deferred():
+def test_invoke_all_task_types_return_envelope_not_503(internal_auth_headers):
     for task in TaskType:
-        response = client.post(f"/ai/tasks/{task.value}/invoke", json={"input": {}})
-        assert response.status_code == 503, task
-        data = response.json()["detail"]
+        response = client.post(
+            f"/ai/tasks/{task.value}/invoke",
+            json={"input": {}},
+            headers=internal_auth_headers,
+        )
+        assert response.status_code == 200, task
+        data = response.json()
         assert data["editable"] is True
         assert data["user_confirmation_required"] is True
         assert data["degraded"] is True
-        assert data["content"]["status"] == "unavailable"
-        assert data["task"] == task.value
         NormalizedAIResponse.model_validate(data)
+
+
+def test_invoke_live_envelope_when_nim_mocked(internal_auth_headers):
+    with patch("app.providers.router._provider_available", return_value=True):
+        with patch(
+            "app.providers.router.call_with_resilience",
+            return_value={"ok": True, "result": {"reply": "Deload week."}},
+        ):
+            response = client.post(
+                "/ai/tasks/chat/invoke",
+                json={"input": {"prompt": "hi"}},
+                headers=internal_auth_headers,
+            )
+    data = response.json()
+    assert data["degraded"] is False
+    assert data["provider"] == "nvidia_nim"
 
 
 def test_ai_service_has_no_direct_db_write_imports():

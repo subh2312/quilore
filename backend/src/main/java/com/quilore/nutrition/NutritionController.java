@@ -1,6 +1,9 @@
 package com.quilore.nutrition;
 
+import com.quilore.ai.AiGatewayClient;
+import com.quilore.billing.EntitlementService;
 import com.quilore.security.CurrentUser;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -9,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -18,6 +22,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/nutrition")
 public class NutritionController {
+    private static final String AI_MEAL_SCAN_QUOTA = "ai_meal_scan";
 
     private final IcmrRdaService rdaService;
     private final MacroTargetService macroTargetService;
@@ -27,6 +32,8 @@ public class NutritionController {
     private final NutritionTrainingInsightService insightService;
     private final MealLogService mealLogService;
     private final MealTimingService mealTimingService;
+    private final AiGatewayClient aiGatewayClient;
+    private final EntitlementService entitlementService;
 
     public NutritionController(
             IcmrRdaService rdaService,
@@ -36,7 +43,9 @@ public class NutritionController {
             ManualMealNutritionService mealNutritionService,
             NutritionTrainingInsightService insightService,
             MealLogService mealLogService,
-            MealTimingService mealTimingService
+            MealTimingService mealTimingService,
+            AiGatewayClient aiGatewayClient,
+            EntitlementService entitlementService
     ) {
         this.rdaService = rdaService;
         this.macroTargetService = macroTargetService;
@@ -46,6 +55,8 @@ public class NutritionController {
         this.insightService = insightService;
         this.mealLogService = mealLogService;
         this.mealTimingService = mealTimingService;
+        this.aiGatewayClient = aiGatewayClient;
+        this.entitlementService = entitlementService;
     }
 
     @PostMapping("/targets/macros/{userId}")
@@ -219,6 +230,19 @@ public class NutritionController {
         return ResponseEntity.ok(flags.stream().map(mealTimingService::toMap).toList());
     }
 
+    @PostMapping("/food-quality")
+    public ResponseEntity<?> foodQuality(@RequestBody Map<String, Object> body) {
+        UUID userId = CurrentUser.requireUserId();
+        ResponseEntity<Map<String, Object>> limited = consumeQuotaOr429(userId, "food-quality");
+        if (limited != null) {
+            return limited;
+        }
+        @SuppressWarnings("unchecked")
+        List<String> dishes = (List<String>) body.getOrDefault("dishes", List.of());
+        String notes = body.get("notes") == null ? null : String.valueOf(body.get("notes"));
+        return ResponseEntity.ok(aiGatewayClient.foodQuality(dishes, notes));
+    }
+
     @GetMapping("/units/household")
     public ResponseEntity<?> householdUnits() {
         CurrentUser.requireAuthentication();
@@ -236,6 +260,24 @@ public class NutritionController {
                 ),
                 "note", "Unsupported units require user clarification rather than silent conversion."
         ));
+    }
+
+    private ResponseEntity<Map<String, Object>> consumeQuotaOr429(UUID userId, String task) {
+        try {
+            entitlementService.consumeQuota(userId, AI_MEAL_SCAN_QUOTA);
+            return null;
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode() != HttpStatus.TOO_MANY_REQUESTS) {
+                throw ex;
+            }
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                    "userId", userId.toString(),
+                    "task", task,
+                    "editable", true,
+                    "degraded", true,
+                    "userConfirmationRequired", true,
+                    "message", "AI scan quota exceeded for this billing period. Please wait for reset or upgrade your plan."));
+        }
     }
 
 }
