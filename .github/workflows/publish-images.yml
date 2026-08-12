@@ -1,8 +1,8 @@
 name: Publish — Versioned Container Images
 
-# Publishes versioned **linux/arm64** images to GHCR after CI-green merges to `dev`
-# (staging channel) and on explicit version tags (release candidates).
-# amd64 is intentionally not built — deploy targets are Raspberry Pi / ARM only.
+# Publishes **linux/arm64 only** images to GHCR after merges to `dev` (and on tags).
+# Builds/publishes only services whose paths changed. Then deploys those services to the Pi.
+# Client/mobile changes do not publish or deploy server images (reserved for a later mobile pipeline).
 
 on:
   push:
@@ -14,6 +14,14 @@ on:
         description: 'Git ref to build (branch, tag, or SHA)'
         required: false
         default: ''
+      force_backend:
+        description: 'Force backend publish+deploy'
+        type: boolean
+        default: false
+      force_ai:
+        description: 'Force ai-service publish+deploy'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,23 +35,128 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  publish:
-    name: Build & Publish Images
+  changes:
+    name: Detect changed services
     runs-on: ubuntu-latest
-    # Re-run service tests before publishing so artifacts are never cut from a red build.
+    outputs:
+      backend: ${{ steps.set.outputs.backend }}
+      ai: ${{ steps.set.outputs.ai }}
+      deploy_config: ${{ steps.set.outputs.deploy_config }}
+      client: ${{ steps.set.outputs.client }}
+      any_server: ${{ steps.set.outputs.any_server }}
     steps:
-      - name: Resolve checkout ref
-        id: ref
-        run: |
-          if [ -n "${{ inputs.ref }}" ]; then
-            echo "value=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "value=${{ github.ref }}" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: actions/checkout@v4
         with:
-          ref: ${{ steps.ref.outputs.value }}
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Path filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            ai:
+              - 'ai-service/**'
+            deploy_config:
+              - 'deploy/**'
+              - 'docker-compose.yml'
+              - '.env.example'
+            client:
+              - 'client/**'
+
+      - name: Resolve publish flags
+        id: set
+        run: |
+          set -euo pipefail
+          BACKEND='${{ steps.filter.outputs.backend }}'
+          AI='${{ steps.filter.outputs.ai }}'
+          DEPLOY='${{ steps.filter.outputs.deploy_config }}'
+          CLIENT='${{ steps.filter.outputs.client }}'
+
+          # Tags → publish both server images
+          if [[ '${{ github.ref }}' == refs/tags/v* ]]; then
+            BACKEND=true
+            AI=true
+          fi
+          if [[ '${{ inputs.force_backend }}' == 'true' ]]; then BACKEND=true; fi
+          if [[ '${{ inputs.force_ai }}' == 'true' ]]; then AI=true; fi
+
+          # Manual dispatch with no path signal → publish both
+          if [[ '${{ github.event_name }}' == 'workflow_dispatch' \
+                && '${{ inputs.force_backend }}' != 'true' \
+                && '${{ inputs.force_ai }}' != 'true' \
+                && "${BACKEND}" != 'true' && "${AI}" != 'true' ]]; then
+            BACKEND=true
+            AI=true
+          fi
+
+          ANY=false
+          if [[ "$BACKEND" == 'true' || "$AI" == 'true' || "$DEPLOY" == 'true' ]]; then
+            ANY=true
+          fi
+
+          {
+            echo "backend=${BACKEND}"
+            echo "ai=${AI}"
+            echo "deploy_config=${DEPLOY}"
+            echo "client=${CLIENT}"
+            echo "any_server=${ANY}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "backend=$BACKEND ai=$AI deploy_config=$DEPLOY client=$CLIENT any_server=$ANY"
+
+  meta:
+    name: Image metadata
+    needs: changes
+    if: needs.changes.outputs.any_server == 'true' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.ai == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      owner: ${{ steps.meta.outputs.owner }}
+      sha_short: ${{ steps.meta.outputs.sha_short }}
+      full_sha: ${{ steps.meta.outputs.full_sha }}
+      channel: ${{ steps.meta.outputs.channel }}
+      version: ${{ steps.meta.outputs.version }}
+      backend_image: ${{ steps.meta.outputs.backend_image }}
+      ai_image: ${{ steps.meta.outputs.ai_image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Derive image metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          SHA_SHORT="$(git rev-parse --short HEAD)"
+          FULL_SHA="$(git rev-parse HEAD)"
+          CHANNEL="staging"
+          VERSION="staging-${SHA_SHORT}"
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            CHANNEL="release"
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          {
+            echo "owner=${OWNER}"
+            echo "sha_short=${SHA_SHORT}"
+            echo "full_sha=${FULL_SHA}"
+            echo "channel=${CHANNEL}"
+            echo "version=${VERSION}"
+            echo "backend_image=${{ env.REGISTRY }}/${OWNER}/quilore-backend"
+            echo "ai_image=${{ env.REGISTRY }}/${OWNER}/quilore-ai-service"
+          } >> "$GITHUB_OUTPUT"
+
+  publish-backend:
+    name: Publish backend (arm64)
+    needs: [changes, meta]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -58,44 +171,6 @@ jobs:
           chmod +x gradlew
           ./gradlew test --no-daemon
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: AI service test gate
-        working-directory: ai-service
-        run: |
-          pip install -r requirements.txt
-          pip install pytest httpx
-          pytest tests/ -v
-
-      - name: Derive image metadata
-        id: meta
-        run: |
-          set -euo pipefail
-          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-          SHA_SHORT="$(git rev-parse --short HEAD)"
-          FULL_SHA="$(git rev-parse HEAD)"
-          CHANNEL="staging"
-          VERSION="staging-${SHA_SHORT}"
-
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            CHANNEL="release"
-            VERSION="${GITHUB_REF_NAME}"
-          fi
-
-          {
-            echo "owner=${OWNER}"
-            echo "sha_short=${SHA_SHORT}"
-            echo "full_sha=${FULL_SHA}"
-            echo "channel=${CHANNEL}"
-            echo "version=${VERSION}"
-            echo "backend_image=${{ env.REGISTRY }}/${OWNER}/quilore-backend"
-            echo "ai_image=${{ env.REGISTRY }}/${OWNER}/quilore-ai-service"
-          } >> "$GITHUB_OUTPUT"
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -103,8 +178,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Target hosts are Raspberry Pi / ARM only — never publish amd64.
-      - name: Set up QEMU (arm64 on amd64 runners)
+      - name: Set up QEMU (arm64)
         uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
@@ -120,15 +194,53 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ${{ steps.meta.outputs.backend_image }}:${{ steps.meta.outputs.version }}
-            ${{ steps.meta.outputs.backend_image }}:sha-${{ steps.meta.outputs.sha_short }}
-            ${{ steps.meta.outputs.backend_image }}:${{ steps.meta.outputs.channel }}
+            ${{ needs.meta.outputs.backend_image }}:${{ needs.meta.outputs.version }}
+            ${{ needs.meta.outputs.backend_image }}:sha-${{ needs.meta.outputs.sha_short }}
+            ${{ needs.meta.outputs.backend_image }}:${{ needs.meta.outputs.channel }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ steps.meta.outputs.full_sha }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.revision=${{ needs.meta.outputs.full_sha }}
+            org.opencontainers.image.version=${{ needs.meta.outputs.version }}
           cache-from: type=gha,scope=backend-arm64
           cache-to: type=gha,mode=max,scope=backend-arm64
+
+  publish-ai:
+    name: Publish ai-service (arm64)
+    needs: [changes, meta]
+    if: needs.changes.outputs.ai == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: AI service test gate
+        working-directory: ai-service
+        run: |
+          pip install -r requirements.txt
+          pip install pytest httpx
+          pytest tests/ -v
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU (arm64)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Publish ai-service image (linux/arm64 only)
         uses: docker/build-push-action@v6
@@ -138,32 +250,140 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ${{ steps.meta.outputs.ai_image }}:${{ steps.meta.outputs.version }}
-            ${{ steps.meta.outputs.ai_image }}:sha-${{ steps.meta.outputs.sha_short }}
-            ${{ steps.meta.outputs.ai_image }}:${{ steps.meta.outputs.channel }}
+            ${{ needs.meta.outputs.ai_image }}:${{ needs.meta.outputs.version }}
+            ${{ needs.meta.outputs.ai_image }}:sha-${{ needs.meta.outputs.sha_short }}
+            ${{ needs.meta.outputs.ai_image }}:${{ needs.meta.outputs.channel }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ steps.meta.outputs.full_sha }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.revision=${{ needs.meta.outputs.full_sha }}
+            org.opencontainers.image.version=${{ needs.meta.outputs.version }}
           cache-from: type=gha,scope=ai-service-arm64
           cache-to: type=gha,mode=max,scope=ai-service-arm64
 
-      - name: Write deployment pin artifact
+  deploy-pi:
+    name: Deploy changed services to Pi
+    needs: [changes, meta, publish-backend, publish-ai]
+    # Run when server-side work happened; allow skipped publish jobs (unchanged service).
+    if: |
+      always()
+      && needs.changes.outputs.any_server == 'true'
+      && (needs.changes.outputs.backend != 'true' || needs.publish-backend.result == 'success')
+      && (needs.changes.outputs.ai != 'true' || needs.publish-ai.result == 'success')
+      && (needs.meta.result == 'success' || needs.meta.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require deploy secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          mkdir -p dist
-          cat > dist/versions.env <<EOF
-          # Generated by publish-images.yml — do not edit by hand in CI.
-          QUILORE_IMAGE_CHANNEL=${{ steps.meta.outputs.channel }}
-          QUILORE_IMAGE_VERSION=${{ steps.meta.outputs.version }}
-          QUILORE_GIT_SHA=${{ steps.meta.outputs.full_sha }}
-          BACKEND_IMAGE=${{ steps.meta.outputs.backend_image }}:${{ steps.meta.outputs.version }}
-          AI_SERVICE_IMAGE=${{ steps.meta.outputs.ai_image }}:${{ steps.meta.outputs.version }}
-          EOF
-          cat dist/versions.env
+          missing=0
+          for v in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_PATH; do
+            if [ -z "${!v}" ]; then
+              echo "Missing secret: $v"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Pi deploy secrets not configured. Set DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_PATH on the repo."
+            exit 1
+          fi
 
-      - name: Upload versions pin
-        uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: quilore-versions-${{ steps.meta.outputs.version }}
-          path: dist/versions.env
-          retention-days: 90
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Install cloudflared
+        run: |
+          curl -fsSL -o /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x /tmp/cloudflared
+          sudo mv /tmp/cloudflared /usr/local/bin/cloudflared
+          cloudflared version
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          cat >> ~/.ssh/config <<'CFG'
+          Host quilore-pi
+            HostName ssh.sm4devlabs.dpdns.org
+            User REPLACE_USER
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            StrictHostKeyChecking accept-new
+            ProxyCommand cloudflared access ssh --hostname %h
+          CFG
+          sed -i "s/REPLACE_USER/${{ secrets.DEPLOY_USER }}/" ~/.ssh/config
+          # Allow override host via secret (default tunnel hostname)
+          if [ -n "${{ secrets.DEPLOY_HOST }}" ]; then
+            sed -i "s/HostName .*/HostName ${{ secrets.DEPLOY_HOST }}/" ~/.ssh/config
+          fi
+
+      - name: Resolve deploy flags & image pins
+        id: pins
+        run: |
+          set -euo pipefail
+          BACKEND_CHANGED='${{ needs.changes.outputs.backend }}'
+          AI_CHANGED='${{ needs.changes.outputs.ai }}'
+          DEPLOY_CFG='${{ needs.changes.outputs.deploy_config }}'
+          OWNER='${{ needs.meta.outputs.owner }}'
+          VER='${{ needs.meta.outputs.version }}'
+          # If only deploy config changed, refresh both app services to current channel tags.
+          if [[ "$BACKEND_CHANGED" != 'true' && "$AI_CHANGED" != 'true' && "$DEPLOY_CFG" == 'true' ]]; then
+            BACKEND_CHANGED=true
+            AI_CHANGED=true
+            VER='staging'
+          fi
+          {
+            echo "deploy_backend=$([[ "$BACKEND_CHANGED" == 'true' ]] && echo 1 || echo 0)"
+            echo "deploy_ai=$([[ "$AI_CHANGED" == 'true' ]] && echo 1 || echo 0)"
+            echo "backend_image=ghcr.io/${OWNER}/quilore-backend:${VER}"
+            echo "ai_image=ghcr.io/${OWNER}/quilore-ai-service:${VER}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Sync checkout + login GHCR + deploy on Pi
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_REF: ${{ needs.meta.outputs.full_sha || github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ssh quilore-pi bash -s <<EOF
+          set -euo pipefail
+          mkdir -p '${DEPLOY_PATH}'
+          AUTH_URL="https://x-access-token:${GHCR_TOKEN}@github.com/${REPO}.git"
+          if [ ! -d '${DEPLOY_PATH}/.git' ]; then
+            git clone "\${AUTH_URL}" '${DEPLOY_PATH}'
+          fi
+          cd '${DEPLOY_PATH}'
+          git remote set-url origin "\${AUTH_URL}"
+          git fetch --prune origin
+          git checkout -B dev origin/dev
+          git reset --hard '${GIT_REF}'
+          # Drop token from remote URL after fetch
+          git remote set-url origin "https://github.com/${REPO}.git"
+
+          if [ ! -f .env ]; then
+            echo "error: ${DEPLOY_PATH}/.env missing on Pi — seed once from .env.example" >&2
+            exit 1
+          fi
+
+          echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
+
+          export BACKEND_IMAGE='${{ steps.pins.outputs.backend_image }}'
+          export AI_SERVICE_IMAGE='${{ steps.pins.outputs.ai_image }}'
+          export DEPLOY_BACKEND='${{ steps.pins.outputs.deploy_backend }}'
+          export DEPLOY_AI='${{ steps.pins.outputs.deploy_ai }}'
+          bash deploy/scripts/deploy-pi.sh
+          EOF
+
+      - name: Skip note for client-only
+        if: needs.changes.outputs.client == 'true' && needs.changes.outputs.any_server != 'true'
+        run: echo "Client-only change — no Pi server deploy (mobile pipeline comes next)."

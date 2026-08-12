@@ -1,9 +1,11 @@
 # Raspberry Pi Gym UAT — preferred path
 
-**Canonical path:** GitHub Actions publishes **`linux/arm64` only** → pull from GHCR → deploy with **k3s** (`deploy/k8s/`).  
-Do **not** clone the monorepo onto the Pi. Do **not** publish or require amd64. Do **not** relocate Docker root (Hermes / HA stay put).
+**Canonical path:** merge to `dev` → GitHub Actions publishes **`linux/arm64` only for changed services** → auto-deploys those services to the Pi (`publish-images.yml` + `deploy/scripts/deploy-pi.sh`).  
+Client/RN changes do not redeploy server containers (mobile pipeline next).
 
-See `deploy/k8s/README.md` for apply steps.
+Do **not** publish amd64. Do **not** relocate Docker root (Hermes / HA stay put).
+
+See `deploy/README.md` (Pi auto-deploy secrets) and `deploy/k8s/README.md` (optional k3s manifests).
 
 ## Mock IAP — two different names
 

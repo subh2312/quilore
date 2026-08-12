@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor-uat-pi-cloudflare-b3f3
 - **PR:** https://github.com/subh2312/quilore/pull/10
+- **What:** Path-filtered CI/publish + automatic Pi deploy on merge to `dev` (only changed backend/ai-service); `deploy/scripts/deploy-pi.sh`; client changes skipped for server CD.
+- **Why:** Dev work is near-complete — merges should ship to Pi without cloning/building everything, and without redeploying unrelated services; mobile CD comes next.
+- **How:** `dorny/paths-filter` in `ci.yml`/`publish-images.yml`; arm64 publish jobs gated per service; deploy job SSHes via Cloudflare Tunnel, pulls GHCR, recreates only changed Compose services. Requires `DEPLOY_*` repo secrets.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** cursor-uat-pi-cloudflare-b3f3
+- **PR:** https://github.com/subh2312/quilore/pull/10
 - **What:** Switched GHCR publish to **linux/arm64 only** (no amd64); added `deploy/k8s/uat` manifests + README; rewrote UAT docs to prefer Actions→GHCR→k3s over cloning/building on the Pi.
 - **Why:** Deploy target is Raspberry Pi / ARM forever; amd64 images and on-Pi monorepo builds were the wrong path and competed with Hermes/HA.
 - **How:** `publish-images.yml` QEMU + `platforms: linux/arm64`; k8s Namespace/StatefulSet/Deployments modeled on saleboomseo; compose marked fallback only.
