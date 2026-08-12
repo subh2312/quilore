@@ -295,9 +295,16 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
-      - name: Install cloudflared
+      - name: Install cloudflared (pinned)
+        env:
+          CLOUDFLARED_VERSION: "2025.2.1"
+          # sha256 of cloudflared-linux-amd64 for CLOUDFLARED_VERSION
+          CLOUDFLARED_SHA256: "afdfadd1ef552e66bffc35246fe30a9bd578356d2d386de95585ccfc432472b8"
         run: |
-          curl -fsSL -o /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          set -euo pipefail
+          curl -fsSL -o /tmp/cloudflared \
+            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
+          echo "${CLOUDFLARED_SHA256}  /tmp/cloudflared" | sha256sum -c -
           chmod +x /tmp/cloudflared
           sudo mv /tmp/cloudflared /usr/local/bin/cloudflared
           cloudflared version
@@ -355,32 +362,27 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          ssh quilore-pi bash -s <<EOF
+          # Pass token via env to remote; never embed in git remote URL.
+          ssh quilore-pi \
+            "DEPLOY_PATH='${DEPLOY_PATH}' GHCR_USER='${GHCR_USER}' GHCR_TOKEN='${GHCR_TOKEN}' GIT_REF='${GIT_REF}' REPO='${REPO}' BACKEND_IMAGE='${{ steps.pins.outputs.backend_image }}' AI_SERVICE_IMAGE='${{ steps.pins.outputs.ai_image }}' DEPLOY_BACKEND='${{ steps.pins.outputs.deploy_backend }}' DEPLOY_AI='${{ steps.pins.outputs.deploy_ai }}' bash -s" <<'EOF'
           set -euo pipefail
-          mkdir -p '${DEPLOY_PATH}'
-          AUTH_URL="https://x-access-token:${GHCR_TOKEN}@github.com/${REPO}.git"
-          if [ ! -d '${DEPLOY_PATH}/.git' ]; then
-            git clone "\${AUTH_URL}" '${DEPLOY_PATH}'
+          mkdir -p "${DEPLOY_PATH}"
+          cd "${DEPLOY_PATH}"
+          if [ ! -d .git ]; then
+            git clone "https://github.com/${REPO}.git" .
           fi
-          cd '${DEPLOY_PATH}'
-          git remote set-url origin "\${AUTH_URL}"
-          git fetch --prune origin
-          git checkout -B dev origin/dev
-          git reset --hard '${GIT_REF}'
-          # Drop token from remote URL after fetch
           git remote set-url origin "https://github.com/${REPO}.git"
+          # Authenticate fetch without storing the token in the remote URL.
+          git -c "http.extraHeader=AUTHORIZATION: bearer ${GHCR_TOKEN}" fetch --prune origin
+          git checkout -B dev origin/dev
+          git reset --hard "${GIT_REF}"
 
           if [ ! -f .env ]; then
             echo "error: ${DEPLOY_PATH}/.env missing on Pi — seed once from .env.example" >&2
             exit 1
           fi
 
-          echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
-
-          export BACKEND_IMAGE='${{ steps.pins.outputs.backend_image }}'
-          export AI_SERVICE_IMAGE='${{ steps.pins.outputs.ai_image }}'
-          export DEPLOY_BACKEND='${{ steps.pins.outputs.deploy_backend }}'
-          export DEPLOY_AI='${{ steps.pins.outputs.deploy_ai }}'
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
           bash deploy/scripts/deploy-pi.sh
           EOF
 
