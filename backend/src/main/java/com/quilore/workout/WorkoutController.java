@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -54,10 +56,9 @@ public class WorkoutController {
     @PostMapping("/{userId}/session-summary")
     public ResponseEntity<?> sessionSummary(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
         CurrentUser.requireSelfOrAdmin(userId);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> exercises = (List<Map<String, Object>>) body.getOrDefault("exercises", List.of());
-        long duration = body.get("durationMinutes") instanceof Number n ? n.longValue() : 0L;
-        String startedAt = String.valueOf(body.getOrDefault("startedAt", ""));
+        List<Map<String, Object>> exercises = requireObjectList(body.get("exercises"), "exercises");
+        long duration = readLong(body.get("durationMinutes"), "durationMinutes");
+        String startedAt = readString(body.get("startedAt"), "startedAt", true);
         return ResponseEntity.ok(sessionSummaryService.summarize(userId, exercises, duration, startedAt));
     }
 
@@ -82,7 +83,7 @@ public class WorkoutController {
             @RequestBody Map<String, Object> body
     ) {
         UUID userId = CurrentUser.requireUserId();
-        long duration = body.get("durationMinutes") instanceof Number n ? n.longValue() : 0L;
+        long duration = readLong(body.get("durationMinutes"), "durationMinutes");
         return ResponseEntity.ok(sessionService.completeSession(userId, sessionId, duration));
     }
 
@@ -93,8 +94,7 @@ public class WorkoutController {
     }
 
     private Map<String, Object> flattenOcrResponse(UUID userId, String text, Map<String, Object> mapped) {
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> exercises = (List<Map<String, Object>>) mapped.getOrDefault("exercises", List.of());
+        List<Map<String, Object>> exercises = requireObjectList(mapped.get("exercises"), "exercises");
         return Map.of(
                 "userId", userId.toString(),
                 "exercises", exercises,
@@ -104,5 +104,41 @@ public class WorkoutController {
                 "envelope", mapped,
                 "userConfirmationRequired", true
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> requireObjectList(Object value, String field) {
+        if (value == null) {
+            return List.of();
+        }
+        if (!(value instanceof List<?> rawList)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be an array of objects");
+        }
+        for (Object item : rawList) {
+            if (!(item instanceof Map<?, ?>)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be an array of objects");
+            }
+        }
+        return (List<Map<String, Object>>) (List<?>) rawList;
+    }
+
+    private long readLong(Object value, String field) {
+        if (value == null) {
+            return 0L;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be numeric");
+    }
+
+    private String readString(Object value, String field, boolean allowNull) {
+        if (value == null && allowNull) {
+            return "";
+        }
+        if (value instanceof String stringValue) {
+            return stringValue;
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be a string");
     }
 }

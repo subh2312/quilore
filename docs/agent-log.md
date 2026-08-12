@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/7
+- **What:** Fixed PR #7 review blockers on live AI endpoints and NIM safety/parsing; swapped Spring AI gateway to synchronous `RestClient`; hardened workout request validation and async startup probing.
+- **Why:** Review findings required quota enforcement on coach endpoints, prompt-injection defenses, safer JSON extraction, non-blocking startup, and merge-order verification against merged PR #6 on `dev`.
+- **How:** Confirmed `origin/dev` was already merged into `cursor` and migration versions remain unique (`V1`-`V8` once each); reused `EntitlementService.consumeQuota()` with explicit 429 envelopes; wrapped/sanitized `<user_input>` blocks plus system guardrails; replaced greedy JSON regex with decoder-based extraction; added regression tests and aligned NIM defaults in `.env.example`.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/7
 - **What:** Merge dev (PR #6) into cursor; keep NIM live invoke + Spring AiGatewayClient; adopt ReceiptValidationService + internal queue token from dev.
 - **Why:** PR #7 CI blocked by merge conflicts after PR #6 merged to dev; reconcile Wave 1A NIM gateway with security/billing fixes.
 - **How:** Resolved 19-file conflict set; NIM/heuristic invoke retained; dev billing mock-receipt + queue auth preserved; CI re-run pending.

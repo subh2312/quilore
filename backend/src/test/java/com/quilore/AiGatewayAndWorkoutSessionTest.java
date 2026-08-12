@@ -3,6 +3,9 @@ package com.quilore;
 import com.quilore.ai.AiEnvelopeValidator;
 import com.quilore.ai.AiGatewayClient;
 import com.quilore.auth.AuthService;
+import com.quilore.billing.EntitlementService;
+import com.quilore.billing.UsageCounterEntity;
+import com.quilore.billing.UsageCounterRepository;
 import com.quilore.workout.SessionSummaryService;
 import com.quilore.workout.WorkoutSessionService;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -33,6 +37,8 @@ class AiGatewayAndWorkoutSessionTest {
     @Autowired AiEnvelopeValidator envelopeValidator;
     @Autowired SessionSummaryService sessionSummaryService;
     @Autowired WorkoutSessionService workoutSessionService;
+    @Autowired EntitlementService entitlementService;
+    @Autowired UsageCounterRepository usageCounterRepository;
 
     @Test
     void envelopeValidatorRequiresEditableFields() {
@@ -68,6 +74,7 @@ class AiGatewayAndWorkoutSessionTest {
         String email = "coach-" + UUID.randomUUID() + "@quilore.test";
         authService.register(email, "password123", "Coach User");
         var login = authService.login(email, "password123");
+        entitlementService.assignPlan(login.userId(), "PREMIUM");
 
         mockMvc.perform(post("/api/coach/chat")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + login.accessToken())
@@ -79,6 +86,41 @@ class AiGatewayAndWorkoutSessionTest {
                 .andExpect(jsonPath("$.editable").value(true))
                 .andExpect(jsonPath("$.envelope.task").value("chat"))
                 .andExpect(jsonPath("$.envelope.degraded").isBoolean());
+    }
+
+    @Test
+    void coachProgramReturns429OnceMonthlyQuotaIsExhausted() throws Exception {
+        String email = "quota-" + UUID.randomUUID() + "@quilore.test";
+        authService.register(email, "password123", "Quota User");
+        var login = authService.login(email, "password123");
+        String token = login.accessToken();
+        entitlementService.assignPlan(login.userId(), "PREMIUM");
+        UsageCounterEntity counter = new UsageCounterEntity();
+        counter.setUserId(login.userId());
+        counter.setFeatureKey("ai_advanced_coaching");
+        counter.setPeriodStart(LocalDate.now().withDayOfMonth(1));
+        counter.setUsedCount(299);
+        usageCounterRepository.save(counter);
+
+        mockMvc.perform(post("/api/coach/chat")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"prompt":"Suggest a deload week"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/coach/program")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"prompt":"Build me a 4 week hypertrophy block"}
+                                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.editable").value(true))
+                .andExpect(jsonPath("$.degraded").value(true))
+                .andExpect(jsonPath("$.task").value("program"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("quota exceeded")));
     }
 
     @Test
@@ -117,6 +159,22 @@ class AiGatewayAndWorkoutSessionTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("completed"));
+    }
+
+    @Test
+    void sessionSummaryRejectsNonObjectExerciseArrays() throws Exception {
+        String email = "summary-" + UUID.randomUUID() + "@quilore.test";
+        authService.register(email, "password123", "Summary User");
+        var login = authService.login(email, "password123");
+        UUID userId = login.userId();
+
+        mockMvc.perform(post("/api/workout/" + userId + "/session-summary")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + login.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"exercises":["not-an-object"],"durationMinutes":45}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

@@ -1,5 +1,6 @@
 """Quilore AI Orchestration Service — FastAPI application."""
 
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
@@ -27,6 +28,22 @@ configure_logging()
 log = get_logger()
 
 
+def _start_nim_probe() -> None:
+    def _log_background_failure(task: asyncio.Task[None]) -> None:
+        try:
+            exc = task.exception()
+        except asyncio.CancelledError:
+            return
+        if exc is not None:
+            log.warning("nim_models_verify_background_failed", reason=str(exc))
+
+    async def _probe() -> None:
+        await asyncio.to_thread(nim_client.verify_models_at_startup)
+
+    task = asyncio.create_task(_probe())
+    task.add_done_callback(_log_background_failure)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup / shutdown lifecycle."""
@@ -40,7 +57,7 @@ async def lifespan(app: FastAPI):
             huggingface_configured=bool(settings.hf_api_token),
         )
         if nim_client.nim_configured():
-            nim_client.verify_models_at_startup()
+            _start_nim_probe()
         refresh_provider_health_metrics()
     yield
     log.info("service_stopping")

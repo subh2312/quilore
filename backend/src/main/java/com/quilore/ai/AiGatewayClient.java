@@ -3,9 +3,8 @@ package com.quilore.ai;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,13 +12,11 @@ import java.util.Map;
 @Service
 public class AiGatewayClient {
 
-    private final WebClient webClient;
-    private final AiGatewayProperties properties;
+    private final RestClient restClient;
     private final AiEnvelopeValidator validator;
 
-    public AiGatewayClient(WebClient aiServiceWebClient, AiGatewayProperties properties, AiEnvelopeValidator validator) {
-        this.webClient = aiServiceWebClient;
-        this.properties = properties;
+    public AiGatewayClient(RestClient aiServiceRestClient, AiGatewayProperties properties, AiEnvelopeValidator validator) {
+        this.restClient = aiServiceRestClient;
         this.validator = validator;
     }
 
@@ -59,13 +56,12 @@ public class AiGatewayClient {
     public Map<String, Object> invokeTask(String task, Map<String, Object> input) {
         Map<String, Object> body = Map.of("input", input == null ? Map.of() : input);
         try {
-            Map<String, Object> envelope = webClient.post()
+            Map<String, Object> envelope = restClient.post()
                     .uri("/ai/tasks/{task}/invoke", task)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(body)
+                    .body(body)
                     .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                    .block(Duration.ofMillis(properties.readTimeoutMs()));
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
             return validator.validate(envelope);
         } catch (Exception ex) {
             return validator.degradedUnavailable(task, ex.getClass().getSimpleName());
@@ -74,13 +70,12 @@ public class AiGatewayClient {
 
     private Map<String, Object> postJson(String path, Map<String, Object> body) {
         try {
-            return webClient.post()
+            return restClient.post()
                     .uri(path)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(body)
+                    .body(body)
                     .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                    .block(Duration.ofMillis(properties.readTimeoutMs()));
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
         } catch (Exception ex) {
             Map<String, Object> fallback = new LinkedHashMap<>();
             fallback.put("degraded", true);
