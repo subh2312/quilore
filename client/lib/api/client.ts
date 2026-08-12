@@ -1,82 +1,81 @@
-import { getApiBaseUrl } from './config';
-import { getAccessToken } from './authStorage';
-import type { ApiError } from './types';
+import { getApiBaseUrl } from "./config";
+import { getStoredAccessToken } from "./authStorage";
+
+export type ApiErrorBody = Record<string, unknown> | string | null;
+export type ApiClientErrorShape = {
+  status: number;
+  message: string;
+  endpointUnavailable?: boolean;
+  body?: ApiErrorBody;
+};
 
 export class ApiClientError extends Error {
   status: number;
   endpointUnavailable: boolean;
-
-  constructor(payload: ApiError) {
-    super(payload.message);
-    this.name = 'ApiClientError';
-    this.status = payload.status;
-    this.endpointUnavailable = payload.endpointUnavailable ?? false;
+  body?: ApiErrorBody;
+  constructor(shape: ApiClientErrorShape) {
+    super(shape.message);
+    this.name = "ApiClientError";
+    this.status = shape.status;
+    this.endpointUnavailable = Boolean(shape.endpointUnavailable);
+    this.body = shape.body;
   }
 }
 
-type RequestOptions = {
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  body?: unknown;
-  auth?: boolean;
-  headers?: Record<string, string>;
-};
+export type ApiRequestInit = { method?: string; body?: unknown; auth?: boolean };
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = true, headers = {} } = options;
-  const url = `${getApiBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`;
-
-  const reqHeaders: Record<string, string> = {
-    Accept: 'application/json',
-    ...headers,
-  };
-
-  if (body !== undefined) {
-    reqHeaders['Content-Type'] = 'application/json';
-  }
-
-  if (auth) {
-    const token = await getAccessToken();
-    if (token) reqHeaders.Authorization = `Bearer ${token}`;
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method,
-      headers: reqHeaders,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch (err) {
-    throw new ApiClientError({
-      status: 0,
-      message: err instanceof Error ? err.message : 'Network request failed',
-      endpointUnavailable: true,
-    });
-  }
-
-  const text = await response.text();
-  let parsed: unknown = null;
-  if (text) {
+async function readErrorBody(res: Response): Promise<ApiErrorBody> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
     try {
-      parsed = JSON.parse(text);
+      return (await res.json()) as Record<string, unknown>;
     } catch {
-      parsed = text;
+      return null;
     }
   }
+  const text = await res.text().catch(() => "");
+  return text || null;
+}
 
-  if (!response.ok) {
-    const message =
-      typeof parsed === 'object' && parsed !== null && 'message' in parsed
-        ? String((parsed as { message: unknown }).message)
-        : typeof parsed === 'string'
-          ? parsed
-          : `HTTP ${response.status}`;
+function getErrorMessage(body: ApiErrorBody, fallback: string): string {
+  if (typeof body === "string") return body || fallback;
+  if (body && typeof body === "object") {
+    const message = body.message;
+    if (typeof message === "string" && message.length > 0) return message;
+  }
+  return fallback;
+}
+
+export async function apiRequest<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
+  const base = getApiBaseUrl();
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (init.body !== undefined) headers["Content-Type"] = "application/json";
+  if (init.auth !== false) {
+    const token = await getStoredAccessToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method: init.method ?? "GET",
+      headers,
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+    });
+  } catch (err) {
+    throw new ApiClientError({ status: 0, message: err instanceof Error ? err.message : "Network error", endpointUnavailable: true });
+  }
+  if ([404, 501, 502, 503].includes(res.status)) {
+    throw new ApiClientError({ status: res.status, message: `Endpoint unavailable: ${path}`, endpointUnavailable: true });
+  }
+  if (!res.ok) {
+    const body = await readErrorBody(res);
     throw new ApiClientError({
-      status: response.status,
-      message,
-      endpointUnavailable: response.status === 404 || response.status === 503,
+      status: res.status,
+      message: getErrorMessage(body, res.statusText),
+      endpointUnavailable: false,
+      body,
     });
   }
-
-  return parsed as T;
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
 }

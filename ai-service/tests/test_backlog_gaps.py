@@ -50,19 +50,27 @@ def test_queue_idempotent_enqueue_and_status(monkeypatch):
     assert unauthorized.status_code == 401
     a = client.post(
         "/ai/queue/jobs",
-        json={"task_type": "program_generation", "payload": {}, "idempotency_key": "k1"},
         headers=headers,
+        json={"task_type": "program_generation", "payload": {}, "idempotency_key": "k1"},
     )
     b = client.post(
         "/ai/queue/jobs",
-        json={"task_type": "program_generation", "payload": {}, "idempotency_key": "k1"},
         headers=headers,
+        json={"task_type": "program_generation", "payload": {}, "idempotency_key": "k1"},
     )
     assert a.status_code == 200
     assert a.json()["job"]["id"] == b.json()["job"]["id"]
     job_id = a.json()["job"]["id"]
-    client.post("/ai/queue/jobs/process-next", headers=headers)
-    got = client.get(f"/ai/queue/jobs/{job_id}", headers=headers)
+    unauthorized_process = client.post("/ai/queue/jobs/process-next")
+    assert unauthorized_process.status_code == 401
+    for _ in range(10):
+        got = client.get(f"/ai/queue/jobs/{job_id}", headers=headers)
+        if got.json()["status"] == "completed":
+            break
+        client.post(
+            "/ai/queue/jobs/process-next",
+            headers=headers,
+        )
     assert got.json()["status"] == "completed"
     assert got.json()["result"] is not None
 

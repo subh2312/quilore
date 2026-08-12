@@ -1,38 +1,25 @@
-import { apiRequest } from './client';
-import { clearSession, getRefreshToken, saveSession } from './authStorage';
-import type { AuthSession, AuthUser } from './types';
+import { apiRequest } from "./client";
+import { clearStoredSession, persistSession } from "./authStorage";
+import type { AuthSession, AuthUser } from "./types";
 
-export async function login(email: string, password: string): Promise<AuthSession> {
-  const session = await apiRequest<AuthSession>('/api/auth/login', {
-    method: 'POST',
-    body: { email, password },
-    auth: false,
-  });
-  await saveSession(session.accessToken, session.refreshToken, session.user.id);
-  return session;
+export function isSupportOrAdmin(role: string): boolean {
+  return role === "SUPPORT" || role === "ADMIN";
 }
 
 export async function fetchMe(): Promise<AuthUser> {
-  return apiRequest<AuthUser>('/api/auth/me');
+  return apiRequest<AuthUser>("/api/auth/me");
 }
 
-export async function refreshSession(): Promise<AuthSession | null> {
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) return null;
+export async function login(email: string, password: string): Promise<AuthSession> {
+  const session = await apiRequest<AuthSession>("/api/auth/login", { method: "POST", body: { email, password }, auth: false });
+  await persistSession({ accessToken: session.accessToken, refreshToken: session.refreshToken, userId: session.user.id });
+  return session;
+}
+
+export async function logout(refreshToken: string) {
   try {
-    const session = await apiRequest<AuthSession>('/api/auth/refresh', {
-      method: 'POST',
-      body: { refreshToken },
-      auth: false,
-    });
-    await saveSession(session.accessToken, session.refreshToken, session.user.id);
-    return session;
-  } catch {
-    await clearSession();
-    return null;
+    await apiRequest("/api/auth/logout", { method: "POST", body: { refreshToken } });
+  } finally {
+    await clearStoredSession();
   }
-}
-
-export function isSupportOrAdmin(role: string): boolean {
-  return role === 'SUPPORT' || role === 'ADMIN';
 }

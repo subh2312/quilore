@@ -1,5 +1,4 @@
 import { apiRequest, ApiClientError } from './client';
-import { getStoredUserId } from './authStorage';
 import type { CoachChatRequest, CoachChatResponse, CoachProgramRequest, CoachProgramResponse } from './types';
 
 function unwrapCoachReply(envelope: Record<string, unknown>): CoachChatResponse {
@@ -31,15 +30,21 @@ function localCoachFallback(message: string): CoachChatResponse {
 }
 
 export async function sendCoachChat(body: CoachChatRequest): Promise<CoachChatResponse> {
-  const userId = await getStoredUserId();
-  if (!userId) return localCoachFallback(body.message);
   try {
     const res = await apiRequest<{ envelope: Record<string, unknown> }>(
-      `/api/coach/${userId}/chat`,
+      '/api/coach/chat',
       { method: 'POST', body: { prompt: body.message } },
     );
     return unwrapCoachReply(res.envelope);
   } catch (err) {
+    if (err instanceof ApiClientError && err.status === 429) {
+      const degraded = localCoachFallback(body.message);
+      const bodyMessage =
+        err.body && typeof err.body === 'object' && typeof err.body.message === 'string'
+          ? err.body.message
+          : err.message;
+      return { ...degraded, degraded: true, message: bodyMessage, provider: 'quota-degraded' };
+    }
     if (err instanceof ApiClientError && err.endpointUnavailable) {
       return localCoachFallback(body.message);
     }
@@ -50,17 +55,9 @@ export async function sendCoachChat(body: CoachChatRequest): Promise<CoachChatRe
 export async function requestProgramGeneration(
   body: CoachProgramRequest,
 ): Promise<CoachProgramResponse> {
-  const userId = await getStoredUserId();
-  if (!userId) {
-    return {
-      jobId: `local_${Date.now()}`,
-      status: 'queued',
-      message: 'Sign in to queue program generation on the server.',
-    };
-  }
   try {
     const res = await apiRequest<{ queued: { job?: { id?: string } } }>(
-      `/api/coach/${userId}/program`,
+      '/api/coach/program',
       { method: 'POST', body: { prompt: body.prompt, idempotencyKey: body.goalType } },
     );
     return {
@@ -69,6 +66,17 @@ export async function requestProgramGeneration(
       message: 'Program generation queued — confirm draft before applying.',
     };
   } catch (err) {
+    if (err instanceof ApiClientError && err.status === 429) {
+      return {
+        jobId: `quota_${Date.now()}`,
+        status: 'degraded',
+        message:
+          err.body && typeof err.body === 'object' && typeof err.body.message === 'string'
+            ? err.body.message
+            : err.message,
+        degraded: true,
+      };
+    }
     if (err instanceof ApiClientError && err.endpointUnavailable) {
       return {
         jobId: `local_${Date.now()}`,

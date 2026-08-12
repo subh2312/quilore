@@ -41,3 +41,31 @@ def test_process_next_fails_closed_when_token_not_configured(monkeypatch):
     )
     assert response.status_code == 503
     assert response.json()["detail"] == "internal_api_token_not_configured"
+
+
+def test_enqueue_and_get_require_internal_token(monkeypatch):
+    monkeypatch.setattr(settings, "internal_api_token", "secure-worker-token")
+
+    missing_enqueue = client.post(
+        "/ai/queue/jobs",
+        json={"task_type": "program_generation", "payload": {}},
+    )
+    assert missing_enqueue.status_code == 401
+    assert missing_enqueue.json()["detail"] == "invalid_internal_api_token"
+
+    authorized_enqueue = client.post(
+        "/ai/queue/jobs",
+        headers={"X-Internal-Token": "secure-worker-token"},
+        json={"task_type": "program_generation", "payload": {}},
+    )
+    assert authorized_enqueue.status_code == 200
+    job_id = authorized_enqueue.json()["job"]["id"]
+
+    missing_get = client.get(f"/ai/queue/jobs/{job_id}")
+    assert missing_get.status_code == 401
+
+    authorized_get = client.get(
+        f"/ai/queue/jobs/{job_id}",
+        headers={"Authorization": "Bearer secure-worker-token"},
+    )
+    assert authorized_get.status_code == 200

@@ -1,81 +1,43 @@
-/**
- * Secure token storage for Spring Boot JWT sessions.
- */
-
-let memoryToken: string | null = null;
-let memoryRefresh: string | null = null;
-let memoryUserId: string | null = null;
+const memory: Record<string, string | undefined> = {};
 
 async function secureGet(key: string): Promise<string | null> {
+  if (process.env.JEST_WORKER_ID !== undefined) return memory[key] ?? null;
   try {
-    const SecureStore = await import('expo-secure-store');
-    return SecureStore.getItemAsync(key);
+    const SecureStore = await import("expo-secure-store");
+    return (await SecureStore.getItemAsync(key)) ?? null;
   } catch {
-    return null;
+    return memory[key] ?? null;
   }
 }
 
-async function secureSet(key: string, value: string): Promise<void> {
+async function secureSet(key: string, value: string | null) {
+  if (process.env.JEST_WORKER_ID !== undefined) {
+    memory[key] = value ?? undefined;
+    return;
+  }
   try {
-    const SecureStore = await import('expo-secure-store');
-    await SecureStore.setItemAsync(key, value);
+    const SecureStore = await import("expo-secure-store");
+    if (value == null) await SecureStore.deleteItemAsync(key);
+    else await SecureStore.setItemAsync(key, value);
   } catch {
-    /* Expo Go / web fallback */
+    memory[key] = value ?? undefined;
   }
 }
 
-async function secureDelete(key: string): Promise<void> {
-  try {
-    const SecureStore = await import('expo-secure-store');
-    await SecureStore.deleteItemAsync(key);
-  } catch {
-    /* noop */
-  }
+const KEYS = { access: "quilore_access_token", refresh: "quilore_refresh_token", userId: "quilore_user_id" } as const;
+
+export async function getStoredAccessToken() { return secureGet(KEYS.access); }
+export async function getStoredRefreshToken() { return secureGet(KEYS.refresh); }
+export async function getStoredUserId() { return secureGet(KEYS.userId); }
+
+export async function persistSession(session: { accessToken: string; refreshToken: string; userId: string }) {
+  await secureSet(KEYS.access, session.accessToken);
+  await secureSet(KEYS.refresh, session.refreshToken);
+  await secureSet(KEYS.userId, session.userId);
 }
 
-const KEYS = {
-  access: 'quilore_access_token',
-  refresh: 'quilore_refresh_token',
-  userId: 'quilore_user_id',
-} as const;
-
-export async function getAccessToken(): Promise<string | null> {
-  if (memoryToken) return memoryToken;
-  memoryToken = await secureGet(KEYS.access);
-  return memoryToken;
-}
-
-export async function getRefreshToken(): Promise<string | null> {
-  if (memoryRefresh) return memoryRefresh;
-  memoryRefresh = await secureGet(KEYS.refresh);
-  return memoryRefresh;
-}
-
-export async function getStoredUserId(): Promise<string | null> {
-  if (memoryUserId) return memoryUserId;
-  memoryUserId = await secureGet(KEYS.userId);
-  return memoryUserId;
-}
-
-export async function saveSession(accessToken: string, refreshToken: string, userId: string) {
-  memoryToken = accessToken;
-  memoryRefresh = refreshToken;
-  memoryUserId = userId;
-  await secureSet(KEYS.access, accessToken);
-  await secureSet(KEYS.refresh, refreshToken);
-  await secureSet(KEYS.userId, userId);
-}
-
-export async function clearSession() {
-  memoryToken = null;
-  memoryRefresh = null;
-  memoryUserId = null;
-  await secureDelete(KEYS.access);
-  await secureDelete(KEYS.refresh);
-  await secureDelete(KEYS.userId);
-}
-
-/** Test helper — inject token without SecureStore. */
-export function setAccessTokenForTests(token: string | null) {
-  memoryToken = token;
+export async function clearStoredSession() {
+  await secureSet(KEYS.access, null);
+  await secureSet(KEYS.refresh, null);
+  await secureSet(KEYS.userId, null);
 }
