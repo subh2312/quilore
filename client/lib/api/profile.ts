@@ -1,3 +1,4 @@
+import { getAppVersion } from '@/lib/appVersion';
 import { apiRequest, ApiClientError } from './client';
 
 export type UserProfile = {
@@ -80,7 +81,7 @@ export async function recordConsent(
   try {
     return await apiRequest(`/api/privacy/consents/${userId}`, {
       method: 'POST',
-      body: { consentType, version, accepted, appVersion: '0.1.0' },
+      body: { consentType, version, accepted, appVersion: getAppVersion() },
     });
   } catch (err) {
     if (err instanceof ApiClientError && err.endpointUnavailable) {

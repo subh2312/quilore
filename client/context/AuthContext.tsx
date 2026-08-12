@@ -16,7 +16,12 @@ import {
   refreshSession,
   register as apiRegister,
 } from '@/lib/api/auth';
-import { getStoredAccessToken, getStoredRefreshToken, clearStoredSession } from '@/lib/api/authStorage';
+import {
+  getStoredAccessToken,
+  getStoredRefreshToken,
+  getStoredUserId,
+  clearStoredSession,
+} from '@/lib/api/authStorage';
 import { resolveOnboardingComplete } from '@/lib/api/profile';
 import { enforceInactivityTimeout } from '@/lib/api/sessionActivity';
 import { clearOnboardingCompleteLocal, setOnboardingCompleteLocal } from '@/lib/onboarding/storage';
@@ -38,7 +43,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function loadAuthState(): Promise<{ user: AuthUser | null; onboardingComplete: boolean }> {
   try {
+    const storedUserId = await getStoredUserId();
     if (await enforceInactivityTimeout()) {
+      if (storedUserId) await clearOnboardingCompleteLocal(storedUserId);
       return { user: null, onboardingComplete: false };
     }
     const refreshToken = await getStoredRefreshToken();
