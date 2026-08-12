@@ -4,6 +4,7 @@ import type { AuthSession, AuthUser } from "./types";
 
 /** Set when login/register establishes a new session during an in-flight logout. */
 let newSessionEstablishedDuringLogout = false;
+let inFlightLogoutCount = 0;
 
 function markNewSessionEstablished() {
   newSessionEstablishedDuringLogout = true;
@@ -56,13 +57,16 @@ export async function refreshSession(): Promise<AuthSession | null> {
 }
 
 export async function logout(refreshToken: string) {
-  newSessionEstablishedDuringLogout = false;
+  inFlightLogoutCount += 1;
   try {
     await apiRequest("/api/auth/logout", { method: "POST", body: { refreshToken } });
   } finally {
-    if (!newSessionEstablishedDuringLogout) {
-      await clearStoredSession();
+    inFlightLogoutCount -= 1;
+    if (inFlightLogoutCount === 0) {
+      if (!newSessionEstablishedDuringLogout) {
+        await clearStoredSession();
+      }
+      newSessionEstablishedDuringLogout = false;
     }
-    newSessionEstablishedDuringLogout = false;
   }
 }
