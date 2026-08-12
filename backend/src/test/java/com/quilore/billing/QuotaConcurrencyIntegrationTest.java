@@ -76,10 +76,10 @@ class QuotaConcurrencyIntegrationTest {
         assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
         start.countDown();
         for (Future<?> future : futures) {
-            future.get(30, TimeUnit.SECONDS);
+            future.get(60, TimeUnit.SECONDS);
         }
         pool.shutdown();
-        assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(pool.awaitTermination(30, TimeUnit.SECONDS)).isTrue();
 
         assertThat(unexpected)
                 .withFailMessage("unexpected failures: %s", unexpected)

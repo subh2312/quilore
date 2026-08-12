@@ -2,9 +2,13 @@ package com.quilore.billing;
 
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -12,6 +16,7 @@ import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -21,25 +26,29 @@ public class EntitlementService {
 
     private static final UUID FREE_PLAN_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID PREMIUM_PLAN_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final int QUOTA_CONSUME_ATTEMPTS = 12;
 
     private final PlanRepository planRepository;
     private final PlanEntitlementRepository planEntitlementRepository;
     private final UsageQuotaRepository usageQuotaRepository;
     private final UserEntitlementRepository userEntitlementRepository;
     private final UsageCounterRepository usageCounterRepository;
+    private final TransactionTemplate transactionTemplate;
 
     public EntitlementService(
             PlanRepository planRepository,
             PlanEntitlementRepository planEntitlementRepository,
             UsageQuotaRepository usageQuotaRepository,
             UserEntitlementRepository userEntitlementRepository,
-            UsageCounterRepository usageCounterRepository
+            UsageCounterRepository usageCounterRepository,
+            TransactionTemplate transactionTemplate
     ) {
         this.planRepository = planRepository;
         this.planEntitlementRepository = planEntitlementRepository;
         this.usageQuotaRepository = usageQuotaRepository;
         this.userEntitlementRepository = userEntitlementRepository;
         this.usageCounterRepository = usageCounterRepository;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -146,8 +155,26 @@ public class EntitlementService {
         return Boolean.TRUE.equals(toPlan(resolvePlan(userId)).features().get(featureKey));
     }
 
-    @Transactional
+    /**
+     * Atomically consume one unit of quota. Uses a conditional SQL increment so concurrent
+     * callers cannot push {@code used_count} past the plan limit. First-counter creation races
+     * are retried in a fresh transaction when a unique constraint is hit.
+     */
     public Map<String, Object> consumeQuota(UUID userId, String featureKey) {
+        RuntimeException last = null;
+        for (int attempt = 0; attempt < QUOTA_CONSUME_ATTEMPTS; attempt++) {
+            try {
+                return transactionTemplate.execute(status -> consumeQuotaOnce(userId, featureKey));
+            } catch (DataIntegrityViolationException | ConcurrencyFailureException | TransactionSystemException ex) {
+                last = ex;
+            }
+        }
+        throw last != null
+                ? last
+                : new IllegalStateException("Unable to consume quota after retries");
+    }
+
+    private Map<String, Object> consumeQuotaOnce(UUID userId, String featureKey) {
         if (!isFeatureEnabled(userId, featureKey)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not entitled");
         }
@@ -159,7 +186,18 @@ public class EntitlementService {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Quota exceeded");
         }
 
-        usageCounterRepository.insertIfAbsent(UUID.randomUUID(), userId, featureKey, periodStart);
+        Optional<UsageCounterEntity> existing = usageCounterRepository
+                .findByUserIdAndFeatureKeyAndPeriodStart(userId, featureKey, periodStart);
+
+        if (existing.isEmpty()) {
+            UsageCounterEntity created = new UsageCounterEntity();
+            created.setUserId(userId);
+            created.setFeatureKey(featureKey);
+            created.setPeriodStart(periodStart);
+            created.setUsedCount(1);
+            usageCounterRepository.saveAndFlush(created);
+            return quotaResult(featureKey, 1, limit);
+        }
 
         int updated = usageCounterRepository.tryIncrementIfUnderLimit(
                 userId, featureKey, periodStart, limit);
@@ -172,7 +210,10 @@ public class EntitlementService {
                 .map(UsageCounterEntity::getUsedCount)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.INTERNAL_SERVER_ERROR, "Usage counter missing after increment"));
+        return quotaResult(featureKey, used, limit);
+    }
 
+    private static Map<String, Object> quotaResult(String featureKey, int used, int limit) {
         return Map.of(
                 "featureKey", featureKey,
                 "used", used,
