@@ -19,7 +19,6 @@ import {
 import {
   getStoredAccessToken,
   getStoredRefreshToken,
-  getStoredUserId,
   clearStoredSession,
 } from '@/lib/api/authStorage';
 import { resolveOnboardingComplete } from '@/lib/api/profile';
@@ -43,9 +42,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function loadAuthState(): Promise<{ user: AuthUser | null; onboardingComplete: boolean }> {
   try {
-    const storedUserId = await getStoredUserId();
     if (await enforceInactivityTimeout()) {
-      if (storedUserId) await clearOnboardingCompleteLocal(storedUserId);
       return { user: null, onboardingComplete: false };
     }
     const refreshToken = await getStoredRefreshToken();
@@ -101,8 +98,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (next !== 'active') return;
       void (async () => {
         if (!(await enforceInactivityTimeout())) return;
-        const userId = user?.id;
-        if (userId) await clearOnboardingCompleteLocal(userId);
         setUser(null);
         setOnboardingComplete(false);
       })();
