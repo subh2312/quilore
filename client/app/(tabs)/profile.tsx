@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, Switch, View } from "react-native";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { palette, radii, spacing, typography, touchTarget } from "@/constants/DesignTokens";
 import { fetchMe, isSupportOrAdmin } from "@/lib/api/auth";
 import { fetchEntitlements, mockPurchase, mockRestorePurchases } from "@/lib/api/billing";
 import { setAnalyticsConsent, track } from "@/lib/analytics";
 import { setCrashReportingEnabled } from "@/lib/crashReporting";
+import { useAuth } from "@/context/AuthContext";
 
 const GOALS = ["fat_loss", "recomp", "muscle_gain", "maintain", "performance"] as const;
 
 export default function ProfileScreen() {
+  const { user, signOut } = useAuth();
   const [primaryGoal, setPrimaryGoal] = useState<(typeof GOALS)[number]>("recomp");
   const [analytics, setAnalytics] = useState(false);
   const [crash, setCrash] = useState(true);
@@ -66,11 +68,18 @@ export default function ProfileScreen() {
     }
   }
 
+  async function handleLogout() {
+    await signOut();
+    router.replace("/(auth)/login");
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Profile</Text>
-      <Text style={styles.subtitle}>Goals, consent, privacy, billing, reminders</Text>
-      <Link href="/onboarding/consent" style={styles.link}>Open consent & disclaimer onboarding</Link>
+      <Text style={styles.subtitle}>
+        {user ? `${user.displayName} · ${user.email}` : "Goals, consent, privacy, billing, reminders"}
+      </Text>
+      <Link href="/onboarding/welcome" style={styles.link}>Re-run onboarding & preferences</Link>
       {canAdmin ? (
         <Link href="/admin/food-aliases" style={styles.link}>Open admin food aliases</Link>
       ) : null}
@@ -93,6 +102,9 @@ export default function ProfileScreen() {
         <Text style={styles.primaryText}>Start Premium</Text>
       </Pressable>
       <Pressable style={styles.secondary} onPress={restore}><Text style={styles.secondaryText}>Restore purchases</Text></Pressable>
+      <Pressable style={styles.logout} onPress={handleLogout} accessibilityRole="button">
+        <Text style={styles.logoutText}>Log out</Text>
+      </Pressable>
       {status ? <Text style={styles.status}>{status}</Text> : null}
     </ScrollView>
   );
@@ -121,6 +133,15 @@ const styles = StyleSheet.create({
   primaryText: { color: palette.white, fontWeight: "700" },
   secondary: { minHeight: touchTarget.minHeight, borderRadius: radii.md, borderWidth: 1, borderColor: palette.emerald, alignItems: "center", justifyContent: "center" },
   secondaryText: { color: palette.emeraldDark, fontWeight: "700" },
+  logout: {
+    minHeight: touchTarget.minHeight,
+    borderRadius: radii.md,
+    backgroundColor: palette.gray800,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+  },
+  logoutText: { color: palette.white, fontWeight: "800" },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   rowLabel: { color: palette.gray800, fontSize: typography.fontSize.md },
   status: { color: palette.gray700, fontSize: typography.fontSize.sm },

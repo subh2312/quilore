@@ -3,6 +3,14 @@
 - **Date:** 2026-08-12
 - **Tool:** copilot
 - **Branch:** copilot
+- **PR:** (auth/onboarding/splash follow-up to PR #8)
+- **What:** Added Quilore emerald logo assets, Reanimated branded splash, login/signup auth stack wired to Spring Boot JWT, AuthProvider route guards, and four-step onboarding (welcome → consent → profile baseline → goals) with backend profile/goal/consent persistence and local fallback.
+- **Why:** Epic 1 mobile entry — users need branded first launch, secure auth against Spring Boot (never FastAPI), and guided baseline/goal capture per `docs/Quilore.md` §4 Design System and product rules (editable AI output, injury risk flags).
+- **How:** Generated emerald Q-mark assets into `client/assets/images/`, kept `expo-splash-screen` for native boot plus `AnimatedSplash` overlay, extended `lib/api/auth.ts` with `register()`/`refreshSession()`, added `lib/api/profile.ts` + `lib/onboarding/storage.ts`, built `(auth)` and `onboarding` stacks with Reanimated transitions, and gated `(tabs)` until onboarding completes; Profile gets logout and re-run onboarding link.
+
+- **Date:** 2026-08-12
+- **Tool:** copilot
+- **Branch:** copilot
 - **PR:** https://github.com/subh2312/quilore/pull/8
 - **What:** Repointed client AI/network flows to Spring Boot gateway routes, added WatermelonDB Babel decorators config for native APK builds, and surfaced editable/degraded quota fallbacks in chat, nutrition, and workout import flows.
 - **Why:** PR #7 moved live AI invoke behind the Spring AI gateway, so the mobile client must target Spring Boot only, keep JWT auth on every call, and stay APK-ready for gym UAT without marking the remaining 12 Plane stories done before smoke validation.

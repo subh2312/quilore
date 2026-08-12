@@ -3,7 +3,7 @@
  */
 
 import { getApiBaseUrl, UAT_MOCK_RECEIPT, OCR_CONFIDENCE_THRESHOLD } from "../../lib/api/config";
-import { clearStoredSession, persistSession } from "../../lib/api/authStorage";
+import { clearStoredSession, getStoredAccessToken, persistSession } from "../../lib/api/authStorage";
 import { isSupportOrAdmin } from "../../lib/api/auth";
 import { sendCoachChat } from "../../lib/api/coach";
 import { fetchFoodQuality } from "../../lib/api/nutrition";
@@ -41,6 +41,59 @@ describe("Auth role gates", () => {
     expect(isSupportOrAdmin("SUPPORT")).toBe(true);
     expect(isSupportOrAdmin("ADMIN")).toBe(true);
     expect(isSupportOrAdmin("USER")).toBe(false);
+  });
+});
+
+describe("Auth register and refresh", () => {
+  const globalFetch = global.fetch;
+
+  afterEach(async () => {
+    global.fetch = globalFetch;
+    await clearStoredSession();
+  });
+
+  it("registers via Spring Boot and persists session", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        user: { id: "22222222-2222-2222-2222-222222222222", email: "a@b.com", displayName: "Alex", role: "USER" },
+        accessToken: "access-new",
+        refreshToken: "refresh-new",
+        expiresAt: "2026-08-13T00:00:00Z",
+      }),
+    });
+
+    const { register } = await import("../../lib/api/auth");
+    const session = await register("a@b.com", "password123", "Alex");
+
+    expect(session.user.displayName).toBe("Alex");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://localhost:8080/api/auth/register",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(await getStoredAccessToken()).toBe("access-new");
+  });
+
+  it("refreshes session and clears tokens on failure", async () => {
+    await persistSession({
+      accessToken: "old-access",
+      refreshToken: "old-refresh",
+      userId: "11111111-1111-1111-1111-111111111111",
+    });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      headers: { get: () => "application/json" },
+      json: async () => ({ message: "Invalid refresh token" }),
+    });
+
+    const { refreshSession } = await import("../../lib/api/auth");
+    const session = await refreshSession();
+
+    expect(session).toBeNull();
+    expect(await getStoredAccessToken()).toBeNull();
   });
 });
 
