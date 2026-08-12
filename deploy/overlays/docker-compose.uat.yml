@@ -1,0 +1,51 @@
+# Gym / Cloudflare UAT overlay.
+# Keeps services on loopback (tunnel edge). Passes secrets + mock IAP flags
+# that base/staging overlays do not inject into containers.
+#
+# Usage (from repo root on the Pi):
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f deploy/overlays/docker-compose.staging.yml \
+#     -f deploy/overlays/docker-compose.uat.yml \
+#     -f deploy/overlays/docker-compose.tunnel.yml \
+#     up -d
+#
+# For arm64 hosts when GHCR images are amd64-only, drop the staging overlay
+# and build locally instead:
+#   docker compose -f docker-compose.yml \
+#     -f deploy/overlays/docker-compose.uat.yml \
+#     -f deploy/overlays/docker-compose.tunnel.yml \
+#     up -d --build
+
+services:
+  # Soft caps so Quilore coexists with Home Assistant + Hermes on ~4GB Pi RAM.
+  postgres:
+    mem_limit: 512m
+
+  minio:
+    mem_limit: 256m
+
+  backend:
+    mem_limit: 768m
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-staging}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for UAT}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?DATA_ENCRYPTION_KEY is required for UAT}
+      AI_SERVICE_INTERNAL_TOKEN: ${AI_SERVICE_INTERNAL_TOKEN:?AI_SERVICE_INTERNAL_TOKEN is required for UAT}
+      # Master switch — must be true for gym UAT mock IAP. Default false elsewhere.
+      QUILORE_ALLOW_MOCK_RECEIPTS: ${QUILORE_ALLOW_MOCK_RECEIPTS:-true}
+      # Token string the client sends as the receipt body (not an env "flag").
+      QUILORE_MOCK_RECEIPT_TOKEN: ${QUILORE_MOCK_RECEIPT_TOKEN:-UAT_MOCK_RECEIPT}
+      QUILORE_ALLOW_INSECURE_DEFAULTS: "false"
+      NVIDIA_NIM_API_KEY: ${NVIDIA_NIM_API_KEY:-}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75.0}
+
+  ai-service:
+    mem_limit: 512m
+    environment:
+      AI_SERVICE_INTERNAL_TOKEN: ${AI_SERVICE_INTERNAL_TOKEN:?AI_SERVICE_INTERNAL_TOKEN is required for UAT}
+      NVIDIA_NIM_API_KEY: ${NVIDIA_NIM_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      HF_API_TOKEN: ${HF_API_TOKEN:-}
+      ENVIRONMENT: ${ENVIRONMENT:-staging}

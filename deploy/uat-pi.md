@@ -1,95 +1,138 @@
 # Raspberry Pi Gym UAT Deployment
 
-This guide covers hosting the Quilore stack on a Raspberry Pi for sideload APK UAT.
+Host the Quilore stack on a Raspberry Pi (or Pi VPS) and expose it via **Cloudflare Tunnel** for sideload APK UAT.
 
-## Blocker (2026-08-12)
+## Prerequisites
 
-**SSH to Pi is not configured on this machine.**
+- Pi with **4GB+ RAM**, Docker Engine, Docker Compose v2
+- Disk for images/data (prefer SSD, e.g. `/mnt/ssd/apps/quilore`)
+- Cloudflare Tunnel already running (`cloudflared`)
+- SSH access to the host
+
+## Coexistence (do not disturb)
+
+On `local-vps` this host already runs **Home Assistant** (Docker) and **Hermes** (host process on `127.0.0.1:9119`, tunnel `jarvis.sm4devlabs.dpdns.org`).
+
+- **Do not** relocate `Docker Root Dir` (`/mnt/ssd/docker`) or rewrite Docker daemon config.
+- **Do not** stop/restart Hermes or HA unless explicitly required for a conflict.
+- Deploy Quilore as **additional** Compose services under `/mnt/ssd/apps/quilore`.
+- Keep Quilore on loopback (`127.0.0.1:8080` / `:8000`) and publish via Cloudflare only — avoids fighting Hermes/HA LAN ports.
+- Prefer pull/build on the SSD checkout path; leave SD-card root alone.
+
+## Mock IAP — two different names (do not confuse)
+
+| Name | What it is | Where |
+|---|---|---|
+| `QUILORE_ALLOW_MOCK_RECEIPTS` | **Env flag** (true/false). Master switch that allows mock store verification. | Backend `.env` / compose |
+| `UAT_MOCK_RECEIPT` | **Receipt token string** the client POSTs as the receipt body when buying/restoring. | Client constant `client/lib/api/config.ts`; backend default for `QUILORE_MOCK_RECEIPT_TOKEN` |
+
+Correct UAT settings:
 
 ```bash
-ssh pi
-# ssh: Could not resolve hostname pi: nodename nor servname provided, or not known
+QUILORE_ALLOW_MOCK_RECEIPTS=true
+QUILORE_MOCK_RECEIPT_TOKEN=UAT_MOCK_RECEIPT   # optional; this is already the default
 ```
 
-No `Host pi` entry exists in `~/.ssh/config`.
+The old doc line `UAT_MOCK_RECEIPT=true` was wrong — that string is not a boolean env var.
 
-## What you need to provide
+Flow: client sends receipt `UAT_MOCK_RECEIPT` with `platform: mock` → backend accepts it only when `QUILORE_ALLOW_MOCK_RECEIPTS=true`.
 
-1. Pi LAN IP or hostname (e.g. `192.168.1.50`)
-2. SSH user (typically `pi` or your username)
-3. SSH key or password access
-4. Pi with **4GB+ RAM**, Docker Engine, and Docker Compose v2
-
-### Optional: add SSH config
+## Deploy on Pi (Docker Compose + Cloudflare)
 
 ```bash
-# ~/.ssh/config
-Host pi
-  HostName 192.168.1.50
-  User pi
-  IdentityFile ~/.ssh/id_ed25519
-```
-
-Then verify:
-
-```bash
-ssh pi 'docker --version && docker compose version'
-```
-
-## Deploy stack on Pi
-
-On the Pi (after cloning/pulling `cursor` merged into `dev` or checking out the UAT branch):
-
-```bash
-git clone https://github.com/subh2312/quilore.git
+sudo mkdir -p /mnt/ssd/apps/quilore   # if needed; chown to your user
+cd /mnt/ssd/apps
+git clone https://github.com/subh2312/quilore.git quilore
 cd quilore
+git checkout dev   # or the UAT branch under test
 cp .env.example .env
-# Edit .env — NEVER commit real keys:
-#   JWT_SECRET=<32+ random bytes>
-#   DATA_ENCRYPTION_KEY=<base64 32 bytes>
-#   NVIDIA_NIM_API_KEY=<server-side only>
-#   UAT_MOCK_RECEIPT=true   # enables mock IAP for gym UAT
+```
 
+Edit `.env` (never commit):
+
+```bash
+JWT_SECRET=<32+ random bytes>
+DATA_ENCRYPTION_KEY=<base64 32 bytes>
+AI_SERVICE_INTERNAL_TOKEN=<random token>
+QUILORE_ALLOW_MOCK_RECEIPTS=true
+NVIDIA_NIM_API_KEY=<optional; live coach needs this>
+```
+
+**Arm64 note:** GHCR staging images may be `linux/amd64` only. On a Pi, build locally (omit staging overlay):
+
+```bash
 docker compose \
   -f docker-compose.yml \
-  -f deploy/overlays/docker-compose.staging.yml \
+  -f deploy/overlays/docker-compose.uat.yml \
+  -f deploy/overlays/docker-compose.tunnel.yml \
   up -d --build
 ```
 
-Verify health:
+On amd64 with published images:
+
+```bash
+export BACKEND_IMAGE=ghcr.io/subh2312/quilore-backend:staging
+export AI_SERVICE_IMAGE=ghcr.io/subh2312/quilore-ai-service:staging
+docker compose \
+  -f docker-compose.yml \
+  -f deploy/overlays/docker-compose.staging.yml \
+  -f deploy/overlays/docker-compose.uat.yml \
+  -f deploy/overlays/docker-compose.tunnel.yml \
+  up -d --no-build
+```
+
+Health (on the host):
 
 ```bash
 curl -s http://127.0.0.1:8080/api/health
 curl -s http://127.0.0.1:8000/health
 ```
 
-## Point the sideload APK at Pi
+## Cloudflare Tunnel ingress
 
-Build the preview APK with EAS (see `client/docs/APK_BUILD.md`):
+Services bind to `127.0.0.1` only. Add ingress on the **running** tunnel config (often `/etc/cloudflared/config.yml`):
+
+```yaml
+ingress:
+  - hostname: ssh.sm4devlabs.dpdns.org
+    service: ssh://localhost:22
+  # ... existing rules ...
+  - hostname: quilore.sm4devlabs.dpdns.org
+    service: http://127.0.0.1:8080
+  - service: http_status:404
+```
+
+Create DNS (once):
+
+```bash
+cloudflared tunnel route dns sm4devlabs-pi quilore.sm4devlabs.dpdns.org
+```
+
+Reload tunnel (requires sudo if systemd-managed):
+
+```bash
+sudo cp /path/to/updated-config.yml /etc/cloudflared/config.yml
+sudo systemctl restart cloudflared
+```
+
+Verify:
+
+```bash
+curl -sS https://quilore.sm4devlabs.dpdns.org/api/health
+```
+
+## Point the sideload APK at the tunnel
 
 ```bash
 cd client
-EXPO_PUBLIC_API_URL=http://<PI_LAN_IP>:8080 npx eas build --profile preview --platform android
+EXPO_PUBLIC_API_URL=https://quilore.sm4devlabs.dpdns.org npx eas-cli build -p android --profile preview
 ```
 
-For gym Wi‑Fi UAT, devices must reach `http://<PI_LAN_IP>:8080` on the LAN. Android 9+ may require cleartext allowance — the preview build uses HTTP for local UAT only.
-
-Example:
-
-```bash
-EXPO_PUBLIC_API_URL=http://192.168.1.50:8080
-```
-
-## Off-LAN testers (later)
-
-Use Cloudflare Tunnel per `deploy/README.md` and `deploy/overlays/docker-compose.tunnel.yml` instead of exposing port 8080 publicly.
-
-## Mock IAP for UAT
-
-With `UAT_MOCK_RECEIPT=true` on the backend, the client sends receipt `UAT_MOCK_RECEIPT` on purchase/restore to unlock PREMIUM without Play Console. Real Play IAP validation remains deferred to post-license launch.
+See `client/docs/APK_BUILD.md`.
 
 ## Deferred (honest)
 
 - Real Google Play IAP receipt validation
-- Sentry DSN (optional; local crash sink works for UAT)
-- Production TLS domain (Pi LAN HTTP is UAT-only)
+- Multi-arch (`linux/arm64`) GHCR publish (until then, build on Pi)
+- Sentry DSN (optional)
+- k3s/Kubernetes path (optional; Compose is the supported UAT path today)

@@ -1,6 +1,14 @@
 # Agent Log
 
 - **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** cursor/uat-pi-cloudflare-b3f3
+- **PR:** (pending)
+- **What:** Added `deploy/overlays/docker-compose.uat.yml` (injects JWT/encryption/internal-token/mock-IAP into containers) and rewrote `deploy/uat-pi.md` for Cloudflare Tunnel UAT on Pi, clarifying mock-receipt naming.
+- **Why:** Gym UAT needs loopback+tunnel deploy on arm64 Pi; base/staging overlays never passed billing/JWT secrets into containers, and docs incorrectly treated `UAT_MOCK_RECEIPT` as a boolean env flag.
+- **How:** UAT overlay + tunnel overlay; document `QUILORE_ALLOW_MOCK_RECEIPTS=true` vs receipt token `UAT_MOCK_RECEIPT`; prefer `/mnt/ssd/apps/quilore` and local `--build` when GHCR is amd64-only.
+
+- **Date:** 2026-08-12
 - **Tool:** copilot
 - **Branch:** copilot
 - **PR:** https://github.com/subh2312/quilore/pull/8
