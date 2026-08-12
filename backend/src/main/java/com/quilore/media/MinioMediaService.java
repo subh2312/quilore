@@ -10,9 +10,13 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * MinIO media metadata helper (Story: Deploy MinIO for media metadata storage).
- * Object bytes live in MinIO when enabled; Spring Boot always stores metadata references.
- * When {@code minio.enabled=false} (default), uploads are metadata-only with status {@code deferred}.
+ * MinIO media metadata helper.
+ * <p>
+ * When {@code minio.enabled=false} (default), uploads are <strong>deferred</strong>:
+ * metadata is persisted, but no object bytes are uploaded and no usable URL is returned.
+ * Live MinIO upload, ownership-checked retrieval, and short-lived presigned URLs remain a follow-up.
+ * When eventually enabled: generate user-owned key prefixes, upload successfully before
+ * metadata finalization, enforce ownership, and return authorized presigned URLs only.
  */
 @Component
 public class MinioMediaService {
@@ -40,11 +44,14 @@ public class MinioMediaService {
         String key = objectKey == null || objectKey.isBlank()
                 ? "users/" + userId + "/" + UUID.randomUUID()
                 : objectKey;
+        // Always keep user-owned key prefix when a client-supplied key is used.
+        if (!key.startsWith("users/" + userId + "/")) {
+            key = "users/" + userId + "/" + key.replaceAll("^/+", "");
+        }
         long size = bytes == null ? 0 : bytes.length;
         String status = enabled ? "uploaded" : "deferred";
 
         // Live MinIO client upload is deferred until minio.enabled=true and SDK wiring lands.
-        // Do not invent a successful private MinIO upload when disabled.
         if (enabled) {
             throw new UnsupportedOperationException(
                     "Live MinIO upload is not configured in this build; set minio.enabled=false for metadata-only deferred mode"
@@ -62,33 +69,34 @@ public class MinioMediaService {
         entity.setStatus(status);
         MediaObjectEntity saved = mediaObjectRepository.save(entity);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", saved.getId().toString());
-        result.put("bucket", bucket);
-        result.put("objectKey", key);
-        result.put("endpoint", endpoint);
-        result.put("contentType", saved.getContentType());
-        result.put("sizeBytes", size);
-        result.put("checksumSha256", checksum);
-        result.put("status", status);
-        result.put("url", endpoint.replaceAll("/$", "") + "/" + bucket + "/" + key);
-        return result;
+        return toResponse(saved, false);
     }
 
     @Transactional(readOnly = true)
     public Map<String, Object> getMetadata(UUID id) {
         MediaObjectEntity entity = mediaObjectRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Media object not found"));
+        boolean deferred = !"uploaded".equalsIgnoreCase(entity.getStatus());
+        return toResponse(entity, deferred);
+    }
+
+    private Map<String, Object> toResponse(MediaObjectEntity entity, boolean forceDeferred) {
+        boolean deferred = forceDeferred || "deferred".equalsIgnoreCase(entity.getStatus()) || !enabled;
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", entity.getId().toString());
-        result.put("userId", entity.getUserId() == null ? null : entity.getUserId().toString());
+        if (entity.getUserId() != null) {
+            result.put("userId", entity.getUserId().toString());
+        }
         result.put("bucket", entity.getBucket());
         result.put("objectKey", entity.getObjectKey());
+        result.put("endpoint", endpoint);
         result.put("contentType", entity.getContentType());
         result.put("sizeBytes", entity.getSizeBytes());
         result.put("checksumSha256", entity.getChecksumSha256());
-        result.put("status", entity.getStatus());
-        result.put("url", endpoint.replaceAll("/$", "") + "/" + entity.getBucket() + "/" + entity.getObjectKey());
+        result.put("status", deferred ? "deferred" : entity.getStatus());
+        result.put("uploadAvailable", !deferred && enabled);
+        // Never return a constructed endpoint/bucket/key as a usable retrieval URL while deferred.
+        result.put("url", null);
         return result;
     }
 

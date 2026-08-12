@@ -62,6 +62,8 @@ class PersistenceRestartIntegrationTest {
                 "bytes".getBytes(StandardCharsets.UTF_8)
         );
         assertThat(media.get("status")).isEqualTo("deferred");
+        assertThat(media.get("uploadAvailable")).isEqualTo(false);
+        assertThat(media.get("url")).isNull();
         UUID mediaId = UUID.fromString(String.valueOf(media.get("id")));
 
         // Simulate process restart within the same Spring context: flush + clear L1 cache, then reload.
@@ -88,6 +90,8 @@ class PersistenceRestartIntegrationTest {
 
         Map<String, Object> reloadedMedia = minioMediaService.getMetadata(mediaId);
         assertThat(reloadedMedia.get("status")).isEqualTo("deferred");
+        assertThat(reloadedMedia.get("uploadAvailable")).isEqualTo(false);
+        assertThat(reloadedMedia.get("url")).isNull();
         assertThat(reloadedMedia.get("objectKey")).isEqualTo("users/" + userId + "/shot.bin");
         assertThat(reloadedMedia.get("checksumSha256")).isEqualTo(media.get("checksumSha256"));
     }
