@@ -1,31 +1,42 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AnimatedExerciseDemo } from '@/components/quilore/AnimatedExerciseDemo';
+import { PdfImportPanel } from '@/components/quilore/PdfImportPanel';
+import { SessionSummaryCard } from '@/components/quilore/SessionSummaryCard';
 import { VoiceCaptureIndicator } from '@/components/quilore/VoiceCaptureIndicator';
 import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
-import { appendPartial, startListening, stopListening } from '@/lib/voice/whisperStub';
+import { fetchSessionSummary } from '@/lib/api/workout';
+import type { SessionSummaryResponse } from '@/lib/api/types';
+import { appendPartial, getWhisperEngineName, startListening, stopListening } from '@/lib/voice/whisperStub';
 import { upsertLocal } from '@/lib/offline/store';
 import { track } from '@/lib/analytics';
 
-type TemplateExercise = { id: string; name: string; sets: string; reps: string };
+type TemplateExercise = {
+  id: string;
+  name: string;
+  sets: string;
+  reps: string;
+  weightKg?: string;
+};
 
 export default function WorkoutScreen() {
+  const sessionStart = useRef(new Date().toISOString());
   const [listening, setListening] = useState(false);
   const [partial, setPartial] = useState('');
   const [parseError, setParseError] = useState<string | null>(null);
   const [draftExercises, setDraftExercises] = useState<TemplateExercise[]>([
-    { id: '1', name: 'Back Squat', sets: '3', reps: '5' },
+    { id: '1', name: 'Back Squat', sets: '3', reps: '5', weightKg: '100' },
   ]);
-  const [sessionSummary, setSessionSummary] = useState<string | null>(null);
+  const [sessionSummary, setSessionSummary] = useState<SessionSummaryResponse | null>(null);
   const [ocrText, setOcrText] = useState('');
-  const [pdfName, setPdfName] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   function toggleVoice() {
     if (listening) {
       const final = stopListening();
       setListening(false);
       setPartial(final.text);
-      if (!final.text.toLowerCase().includes('set')) {
+      if (!final.text.toLowerCase().includes('set') && !/\d+\s*[x×]\s*\d+/.test(final.text)) {
         setParseError('Could not parse sets — edit manually or retry.');
       } else {
         setParseError(null);
@@ -37,25 +48,57 @@ export default function WorkoutScreen() {
     } else {
       startListening();
       setListening(true);
-      const p = appendPartial('bench three by eight');
-      setPartial(p.text);
+      setPartial(appendPartial('bench three by eight').text);
     }
   }
 
-  function saveSession() {
+  function handleImportMapped(text: string, exercises: { name: string; sets: number; reps: number }[]) {
+    setOcrText(text);
+    if (exercises.length > 0) {
+      setDraftExercises(
+        exercises.map((ex, i) => ({
+          id: `import_${Date.now()}_${i}`,
+          name: ex.name,
+          sets: String(ex.sets),
+          reps: String(ex.reps),
+        })),
+      );
+    }
+  }
+
+  async function saveSession() {
+    setSaving(true);
+    const completedAt = new Date().toISOString();
     const id = `w_${Date.now()}`;
-    upsertLocal('workouts', id, { exercises: draftExercises, completedAt: new Date().toISOString() });
+    upsertLocal('workouts', id, { exercises: draftExercises, startedAt: sessionStart.current, completedAt });
     track('workout_completed', { workoutId: id, exerciseCount: draftExercises.length });
-    setSessionSummary(
-      `Session saved · ${draftExercises.length} exercises · offline queue pending sync`,
-    );
+    try {
+      setSessionSummary(
+        await fetchSessionSummary({
+          sessionId: id,
+          startedAt: sessionStart.current,
+          completedAt,
+          exercises: draftExercises.map((ex) => ({
+            name: ex.name,
+            sets: Array.from({ length: Number(ex.sets) || 1 }, () => ({
+              reps: Number(ex.reps) || 0,
+              weightKg: ex.weightKg ? Number(ex.weightKg) : undefined,
+            })),
+          })),
+        }),
+      );
+      sessionStart.current = new Date().toISOString();
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Workout</Text>
-      <Text style={styles.subtitle}>Voice logging, templates, import, and session summary</Text>
-
+      <Text style={styles.subtitle}>
+        Voice ({getWhisperEngineName()}), templates, import, and session summary
+      </Text>
       <VoiceCaptureIndicator listening={listening} partial={partial} onToggle={toggleVoice} />
       {parseError ? (
         <View style={styles.errorBox}>
@@ -63,7 +106,6 @@ export default function WorkoutScreen() {
           <Text style={styles.hint}>Recovery: edit the template below (NL parse fallback).</Text>
         </View>
       ) : null}
-
       <Text style={styles.section}>Template builder</Text>
       {draftExercises.map((ex) => (
         <View key={ex.id} style={styles.card}>
@@ -78,6 +120,7 @@ export default function WorkoutScreen() {
             <TextInput
               style={[styles.input, styles.small]}
               value={ex.sets}
+              keyboardType="number-pad"
               onChangeText={(sets) =>
                 setDraftExercises((prev) => prev.map((e) => (e.id === ex.id ? { ...e, sets } : e)))
               }
@@ -86,8 +129,18 @@ export default function WorkoutScreen() {
             <TextInput
               style={[styles.input, styles.small]}
               value={ex.reps}
+              keyboardType="number-pad"
               onChangeText={(reps) =>
                 setDraftExercises((prev) => prev.map((e) => (e.id === ex.id ? { ...e, reps } : e)))
+              }
+            />
+            <TextInput
+              style={[styles.input, styles.medium]}
+              value={ex.weightKg ?? ''}
+              placeholder="kg"
+              keyboardType="decimal-pad"
+              onChangeText={(weightKg) =>
+                setDraftExercises((prev) => prev.map((e) => (e.id === ex.id ? { ...e, weightKg } : e)))
               }
             />
           </View>
@@ -103,9 +156,8 @@ export default function WorkoutScreen() {
         }>
         <Text style={styles.secondaryText}>Add exercise</Text>
       </Pressable>
-
       <Text style={styles.section}>Imported plan editor</Text>
-      <Text style={styles.hint}>Edit OCR/PDF imports before save — AI drafts are never final.</Text>
+      <PdfImportPanel onMapped={handleImportMapped} />
       <TextInput
         style={[styles.input, styles.multiline]}
         multiline
@@ -113,21 +165,11 @@ export default function WorkoutScreen() {
         value={ocrText}
         onChangeText={setOcrText}
       />
-      <Pressable
-        style={styles.secondary}
-        onPress={() => {
-          setPdfName('program.pdf');
-          setOcrText((t) => t || 'Squat 3x5\nRDL 3x8');
-        }}>
-        <Text style={styles.secondaryText}>{pdfName ? `PDF: ${pdfName}` : 'Import PDF / OCR draft'}</Text>
-      </Pressable>
-
       <AnimatedExerciseDemo exerciseName="Back Squat" targetMuscle="Quads · Glutes" />
-
-      <Pressable style={styles.primary} onPress={saveSession}>
-        <Text style={styles.primaryText}>Finish session</Text>
+      <Pressable style={styles.primary} onPress={saveSession} disabled={saving}>
+        <Text style={styles.primaryText}>{saving ? 'Saving…' : 'Finish session'}</Text>
       </Pressable>
-      {sessionSummary ? <Text style={styles.summary}>{sessionSummary}</Text> : null}
+      {sessionSummary ? <SessionSummaryCard summary={sessionSummary} /> : null}
     </ScrollView>
   );
 }
@@ -149,6 +191,7 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
   small: { width: 64 },
+  medium: { width: 72 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   x: { fontWeight: '700', color: palette.gray600 },
   primary: {
@@ -170,5 +213,4 @@ const styles = StyleSheet.create({
   secondaryText: { color: palette.emeraldDark, fontWeight: '700' },
   errorBox: { backgroundColor: '#FEE2E2', padding: spacing.sm, borderRadius: radii.md, gap: 4 },
   errorText: { color: palette.red, fontWeight: '600' },
-  summary: { color: palette.gray700, fontSize: typography.fontSize.sm },
 });

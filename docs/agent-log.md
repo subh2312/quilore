@@ -1,9 +1,21 @@
 # Agent Log
 
 - **Date:** 2026-08-12
-- **Tool:** copilot
+- **Tool:** cursor (lead architect)
+- **Branch:** cursor
+- **PR:** (pending) cursor → dev — NIM adapter + Spring AI gateway
+- **What:** NVIDIA NIM client, live FastAPI invoke (no 503 stub), Spring Boot AiGatewayClient/WebClient, coach/workout/nutrition AI endpoints, session summary API + V8 migration.
+- **Why:** Remaining 12 stories Wave 1A — unblock live AI demos and gym UAT backend; client depends on these endpoints.
+- **How:** NIM OpenAI-compatible client with model map + safety; router returns normalized envelopes with heuristic fallback; Spring validates envelopes before persistence; pytest + gradlew pass locally.
+
+- **Date:** 2026-08-12
+- **Tool:** copilot (lead architect)
 - **Branch:** copilot
 - **PR:** https://github.com/subh2312/quilore/pull/6
+- **What:** Wave 1B/2C client — API layer, wired chat/nutrition/workout, PDF import UI, session summary card, admin alias console, WatermelonDB schema, ML Kit OCR + Whisper bridge, eas.json APK profile; CI ruff/eslint fixes.
+- **Why:** Client UAT APK + native parity per plan; extends PR #6 backlog UI with live Spring Boot wiring (not FastAPI direct).
+- **How:** `client/lib/api/*` with offline fallbacks; PdfImportPanel + SessionSummaryCard; admin stack gated SUPPORT; mock IAP hooks; ruff lint fixes for PR #6 ai-service gate.
+
 - **What:** Remaining Plane backlog gaps after PR #5 — client Design System UIs, privacy/flags/admin/goals/analytics/injury/reminders/billing activation APIs, AI queue/OCR/resilience/prompts; verified PR #5 stories as already done.
 - **Why:** Ordered backlog stories not covered by merged PR #5 (auth/nutrition engines/AI gateway 503/observability/CI) still needed product UI + release/privacy/admin surfaces.
 - **How:** Extend Spring Boot domain services (no JWT/quota/MinIO rewrites); add FastAPI queue/OCR/food-quality/prompts without changing Path B invoke 503; build RN screens/components per §4; Jest/pytest/BacklogGapServicesTest coverage.

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ConfirmationChatCard, ConfirmItem } from '@/components/quilore/ConfirmationChatCard';
 import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { sendCoachChat } from '@/lib/api/coach';
 import { track } from '@/lib/analytics';
 import { isFlagEnabled, DEFAULT_FLAGS } from '@/lib/featureFlags';
 
@@ -9,6 +10,8 @@ type Msg = { id: string; role: 'user' | 'coach'; text: string; ai?: boolean };
 
 export default function ChatScreen() {
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([
     {
       id: '1',
@@ -24,27 +27,26 @@ export default function ChatScreen() {
   ]);
   const coachingOn = isFlagEnabled(DEFAULT_FLAGS, 'advanced_coaching');
 
-  function send() {
-    if (!input.trim()) return;
+  async function send() {
+    if (!input.trim() || loading) return;
     const userMsg: Msg = { id: String(Date.now()), role: 'user', text: input.trim() };
-    const lower = input.toLowerCase();
-    let reply =
-      'Noted — I drafted a suggestion. Edit anything before applying (AI observation, not a final plan).';
-    if (lower.includes('superset')) {
-      reply =
-        'Draft: pair Bench Press with Bent-over Row as a superset (3 rounds). Confirm or edit before saving.';
-    } else if (lower.includes('program')) {
-      reply = DEFAULT_FLAGS.program_generation.enabled
-        ? 'Queued personalized program generation (background). You will confirm the draft before it becomes your plan.'
-        : 'Program generation is gated by feature flag / cohort — ask support or try staging.';
-    }
-    setMessages((prev) => [
-      ...prev,
-      userMsg,
-      { id: String(Date.now() + 1), role: 'coach', ai: true, text: reply },
-    ]);
-    track('chat_message_sent', { length: input.trim().length });
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    setLoading(true);
+    setError(null);
+    track('chat_message_sent', { length: userMsg.text.length });
+
+    try {
+      const res = await sendCoachChat({ message: userMsg.text });
+      setMessages((prev) => [
+        ...prev,
+        { id: String(Date.now() + 1), role: 'coach', ai: res.aiObservation, text: res.reply },
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Coach chat failed');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -54,6 +56,7 @@ export default function ChatScreen() {
         <Text style={styles.subtitle}>
           {coachingOn ? 'Advanced coaching enabled' : 'Coaching limited by flag'}
         </Text>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
         {messages.map((m) => (
           <View key={m.id} style={[styles.bubble, m.role === 'user' ? styles.user : styles.coach]}>
             {m.ai ? <Text style={styles.ai}>AI observation</Text> : null}
@@ -87,9 +90,10 @@ export default function ChatScreen() {
           placeholder="e.g. Add a superset for chest day"
           value={input}
           onChangeText={setInput}
+          editable={!loading}
         />
-        <Pressable style={styles.send} onPress={send}>
-          <Text style={styles.sendText}>Send</Text>
+        <Pressable style={[styles.send, loading && styles.sendDisabled]} onPress={send} disabled={loading}>
+          {loading ? <ActivityIndicator color={palette.white} /> : <Text style={styles.sendText}>Send</Text>}
         </Pressable>
       </View>
     </View>
@@ -101,6 +105,7 @@ const styles = StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 24 },
   title: { fontSize: typography.fontSize.xl, fontWeight: '700', color: palette.gray900 },
   subtitle: { fontSize: typography.fontSize.sm, color: palette.gray500, marginBottom: spacing.sm },
+  error: { color: palette.red, fontSize: typography.fontSize.sm },
   bubble: { padding: spacing.md, borderRadius: radii.lg, maxWidth: '92%' },
   user: { alignSelf: 'flex-end', backgroundColor: palette.emerald },
   coach: { alignSelf: 'flex-start', backgroundColor: palette.gray100 },
@@ -129,5 +134,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  sendDisabled: { opacity: 0.6 },
   sendText: { color: palette.white, fontWeight: '700' },
 });
