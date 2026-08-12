@@ -21,8 +21,9 @@ export default function OnboardingGoalsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user) return;
     void (async () => {
-      const draft = await getOnboardingDraft();
+      const draft = await getOnboardingDraft(user.id);
       if (draft.primaryGoal && (GOALS as readonly string[]).includes(draft.primaryGoal)) {
         setPrimaryGoal(draft.primaryGoal as (typeof GOALS)[number]);
       }
@@ -30,7 +31,7 @@ export default function OnboardingGoalsScreen() {
         setCoachingTone(draft.coachingTone as (typeof TONES)[number]);
       }
     })();
-  }, []);
+  }, [user]);
 
   function toggleSecondary(pref: string) {
     setSecondaryPrefs((prev) => (prev.includes(pref) ? prev.filter((p) => p !== pref) : [...prev, pref]));
@@ -40,7 +41,7 @@ export default function OnboardingGoalsScreen() {
     if (!user || busy) return;
     setBusy(true);
     setError(null);
-    await saveOnboardingDraft({ primaryGoal, coachingTone });
+    await saveOnboardingDraft(user.id, { primaryGoal, coachingTone });
     try {
       await saveGoal(user.id, {
         primaryGoal,
@@ -51,7 +52,7 @@ export default function OnboardingGoalsScreen() {
       track('goal_set', { primaryGoal, coachingTone, source: 'onboarding' });
       track('onboarding_completed', { step: 'goals' });
       await markOnboardingComplete();
-      await clearOnboardingDraft();
+      await clearOnboardingDraft(user.id);
       router.replace('/(tabs)');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Saved locally — sync when online.');

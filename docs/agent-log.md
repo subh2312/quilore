@@ -1,6 +1,14 @@
 # Agent Log
 
 - **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/9
+- **What:** Resolved all 8 open PR #9 review threads — user-scoped onboarding drafts, preserved per-user completion flag across logout, consent a11y/error UX, splash hide fallback, dynamic app version in consent audit.
+- **Why:** Bugbot/Copilot/Security review flagged cross-account draft leakage, logout wiping offline onboarding fallback, missing accessibilityState, silent consent failures, splash hang on hideAsync reject, and hard-coded appVersion.
+- **How:** Scoped draft storage to `userId` (mirroring completion flag), stopped clearing completion local on signOut, added `getAppVersion()` via expo-constants, catch + error UI on consent, `.catch` on splash hide, checkbox `accessibilityState`, extended onboarding storage tests.
+
+- **Date:** 2026-08-12
 - **Tool:** copilot
 - **Branch:** copilot
 - **PR:** https://github.com/subh2312/quilore/pull/9

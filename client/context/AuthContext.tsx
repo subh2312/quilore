@@ -17,7 +17,7 @@ import {
 } from '@/lib/api/auth';
 import { getStoredAccessToken, getStoredRefreshToken, clearStoredSession } from '@/lib/api/authStorage';
 import { resolveOnboardingComplete } from '@/lib/api/profile';
-import { clearOnboardingCompleteLocal, setOnboardingCompleteLocal } from '@/lib/onboarding/storage';
+import { setOnboardingCompleteLocal } from '@/lib/onboarding/storage';
 import type { AuthUser } from '@/lib/api/types';
 
 type AuthContextValue = {
@@ -100,18 +100,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     const refreshToken = await getStoredRefreshToken();
-    const userId = user?.id;
     if (refreshToken) {
       await apiLogout(refreshToken);
     } else {
       await clearStoredSession();
     }
-    if (userId) {
-      await clearOnboardingCompleteLocal(userId);
-    }
     setUser(null);
     setOnboardingComplete(false);
-  }, [user]);
+  }, []);
 
   const markOnboardingComplete = useCallback(async () => {
     if (!user) return;

@@ -49,6 +49,10 @@ function onboardingCompleteKey(userId: string) {
   return `${ONBOARDING_COMPLETE_KEY}_${userId}`;
 }
 
+function onboardingDraftKey(userId: string) {
+  return `${ONBOARDING_DRAFT_KEY}_${userId}`;
+}
+
 export async function getOnboardingCompleteLocal(userId: string): Promise<boolean> {
   const raw = await secureGet(onboardingCompleteKey(userId));
   return raw === 'true';
@@ -62,8 +66,8 @@ export async function clearOnboardingCompleteLocal(userId: string) {
   await secureSet(onboardingCompleteKey(userId), null);
 }
 
-export async function getOnboardingDraft(): Promise<OnboardingDraft> {
-  const raw = await secureGet(ONBOARDING_DRAFT_KEY);
+export async function getOnboardingDraft(userId: string): Promise<OnboardingDraft> {
+  const raw = await secureGet(onboardingDraftKey(userId));
   if (!raw) return {};
   try {
     return JSON.parse(raw) as OnboardingDraft;
@@ -72,13 +76,13 @@ export async function getOnboardingDraft(): Promise<OnboardingDraft> {
   }
 }
 
-export async function saveOnboardingDraft(patch: OnboardingDraft) {
-  const existing = await getOnboardingDraft();
-  await secureSet(ONBOARDING_DRAFT_KEY, JSON.stringify({ ...existing, ...patch }));
+export async function saveOnboardingDraft(userId: string, patch: OnboardingDraft) {
+  const existing = await getOnboardingDraft(userId);
+  await secureSet(onboardingDraftKey(userId), JSON.stringify({ ...existing, ...patch }));
 }
 
-export async function clearOnboardingDraft() {
-  await secureSet(ONBOARDING_DRAFT_KEY, null);
+export async function clearOnboardingDraft(userId: string) {
+  await secureSet(onboardingDraftKey(userId), null);
 }
 
 /** Test helper */

@@ -16,32 +16,35 @@ export default function ConsentOnboardingScreen() {
   const [analytics, setAnalytics] = useState(false);
   const [crash, setCrash] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const requiredOk = terms && aiDisclaimer && injuryDisclaimer;
 
   useEffect(() => {
-    void saveOnboardingDraft({ consentsAccepted: false });
-  }, []);
+    if (!user) return;
+    void saveOnboardingDraft(user.id, { consentsAccepted: false });
+  }, [user]);
 
   async function complete() {
-    if (!requiredOk || busy) return;
+    if (!requiredOk || busy || !user) return;
     setBusy(true);
+    setError(null);
     try {
       setAnalyticsConsent(analytics);
       setCrashReportingEnabled(crash);
 
-      if (user) {
-        await Promise.all([
-          recordConsent(user.id, 'terms_of_use', true),
-          recordConsent(user.id, 'ai_editable_disclaimer', true),
-          recordConsent(user.id, 'injury_risk_flag_disclaimer', true),
-          savePrivacyPreferences(user.id, { analyticsOptIn: analytics, crashReportingOptIn: crash }),
-        ]);
-      }
+      await Promise.all([
+        recordConsent(user.id, 'terms_of_use', true),
+        recordConsent(user.id, 'ai_editable_disclaimer', true),
+        recordConsent(user.id, 'injury_risk_flag_disclaimer', true),
+        savePrivacyPreferences(user.id, { analyticsOptIn: analytics, crashReportingOptIn: crash }),
+      ]);
 
-      await saveOnboardingDraft({ consentsAccepted: true });
+      await saveOnboardingDraft(user.id, { consentsAccepted: true });
       track('onboarding_completed', { step: 'consent', analytics, crash });
       router.push('/onboarding/profile-baseline');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save consent. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -78,6 +81,7 @@ export default function ConsentOnboardingScreen() {
         onPress={complete}>
         <Text style={styles.primaryText}>{busy ? 'Saving…' : 'Continue'}</Text>
       </Pressable>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </ScrollView>
   );
 }
@@ -94,7 +98,11 @@ function ToggleRow({
   required?: boolean;
 }) {
   return (
-    <Pressable style={styles.row} onPress={() => onChange(!value)} accessibilityRole="checkbox">
+    <Pressable
+      style={styles.row}
+      onPress={() => onChange(!value)}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: value }}>
       <Text style={styles.check}>{value ? '☑' : '☐'}</Text>
       <Text style={styles.rowLabel}>
         {label}
@@ -122,4 +130,5 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.5 },
   primaryText: { color: palette.white, fontWeight: '700' },
+  error: { color: palette.red, fontWeight: '600' },
 });

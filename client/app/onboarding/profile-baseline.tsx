@@ -24,8 +24,9 @@ export default function ProfileBaselineScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user) return;
     void (async () => {
-      const draft = await getOnboardingDraft();
+      const draft = await getOnboardingDraft(user.id);
       if (draft.age) setAge(String(draft.age));
       if (draft.sex && (SEX_OPTIONS as readonly string[]).includes(draft.sex)) {
         setSex(draft.sex as (typeof SEX_OPTIONS)[number]);
@@ -37,7 +38,7 @@ export default function ProfileBaselineScreen() {
       if (draft.injuriesInfo) setInjuriesInfo(draft.injuriesInfo);
       if (draft.equipmentAccess) setEquipmentAccess(draft.equipmentAccess);
     })();
-  }, []);
+  }, [user]);
 
   const valid =
     Number(age) >= 13 &&
@@ -59,7 +60,7 @@ export default function ProfileBaselineScreen() {
       injuriesInfo,
       equipmentAccess,
     };
-    await saveOnboardingDraft(payload);
+    await saveOnboardingDraft(user.id, payload);
     try {
       await upsertProfile(user.id, payload);
     } catch (err) {

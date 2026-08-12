@@ -32,7 +32,9 @@ export default function RootLayout() {
   useEffect(() => {
     if (!loaded) return;
     void hydrateFromDatabase();
-    void SplashScreen.hideAsync().then(() => setNativeSplashHidden(true));
+    void SplashScreen.hideAsync()
+      .then(() => setNativeSplashHidden(true))
+      .catch(() => setNativeSplashHidden(true));
   }, [loaded]);
 
   if (!loaded) {
