@@ -26,22 +26,25 @@ export default function ConsentOnboardingScreen() {
   async function complete() {
     if (!requiredOk || busy) return;
     setBusy(true);
-    setAnalyticsConsent(analytics);
-    setCrashReportingEnabled(crash);
+    try {
+      setAnalyticsConsent(analytics);
+      setCrashReportingEnabled(crash);
 
-    if (user) {
-      await Promise.all([
-        recordConsent(user.id, 'terms_of_use', true),
-        recordConsent(user.id, 'ai_editable_disclaimer', true),
-        recordConsent(user.id, 'injury_risk_flag_disclaimer', true),
-        savePrivacyPreferences(user.id, { analyticsOptIn: analytics, crashReportingOptIn: crash }),
-      ]);
+      if (user) {
+        await Promise.all([
+          recordConsent(user.id, 'terms_of_use', true),
+          recordConsent(user.id, 'ai_editable_disclaimer', true),
+          recordConsent(user.id, 'injury_risk_flag_disclaimer', true),
+          savePrivacyPreferences(user.id, { analyticsOptIn: analytics, crashReportingOptIn: crash }),
+        ]);
+      }
+
+      await saveOnboardingDraft({ consentsAccepted: true });
+      track('onboarding_completed', { step: 'consent', analytics, crash });
+      router.push('/onboarding/profile-baseline');
+    } finally {
+      setBusy(false);
     }
-
-    await saveOnboardingDraft({ consentsAccepted: true });
-    track('onboarding_completed', { step: 'consent', analytics, crash });
-    router.push('/onboarding/profile-baseline');
-    setBusy(false);
   }
 
   return (

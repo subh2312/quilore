@@ -45,13 +45,21 @@ export type OnboardingDraft = {
   consentsAccepted?: boolean;
 };
 
-export async function getOnboardingCompleteLocal(): Promise<boolean> {
-  const raw = await secureGet(ONBOARDING_COMPLETE_KEY);
+function onboardingCompleteKey(userId: string) {
+  return `${ONBOARDING_COMPLETE_KEY}_${userId}`;
+}
+
+export async function getOnboardingCompleteLocal(userId: string): Promise<boolean> {
+  const raw = await secureGet(onboardingCompleteKey(userId));
   return raw === 'true';
 }
 
-export async function setOnboardingCompleteLocal(complete: boolean) {
-  await secureSet(ONBOARDING_COMPLETE_KEY, complete ? 'true' : null);
+export async function setOnboardingCompleteLocal(complete: boolean, userId: string) {
+  await secureSet(onboardingCompleteKey(userId), complete ? 'true' : null);
+}
+
+export async function clearOnboardingCompleteLocal(userId: string) {
+  await secureSet(onboardingCompleteKey(userId), null);
 }
 
 export async function getOnboardingDraft(): Promise<OnboardingDraft> {
@@ -64,8 +72,9 @@ export async function getOnboardingDraft(): Promise<OnboardingDraft> {
   }
 }
 
-export async function saveOnboardingDraft(draft: OnboardingDraft) {
-  await secureSet(ONBOARDING_DRAFT_KEY, JSON.stringify(draft));
+export async function saveOnboardingDraft(patch: OnboardingDraft) {
+  const existing = await getOnboardingDraft();
+  await secureSet(ONBOARDING_DRAFT_KEY, JSON.stringify({ ...existing, ...patch }));
 }
 
 export async function clearOnboardingDraft() {
@@ -74,6 +83,7 @@ export async function clearOnboardingDraft() {
 
 /** Test helper */
 export function resetOnboardingStorageForTests() {
-  delete memory[ONBOARDING_COMPLETE_KEY];
-  delete memory[ONBOARDING_DRAFT_KEY];
+  for (const key of Object.keys(memory)) {
+    if (key.startsWith('quilore_onboarding_')) delete memory[key];
+  }
 }

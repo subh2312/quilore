@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, ApiClientError } from "./client";
 import { clearStoredSession, getStoredRefreshToken, persistSession } from "./authStorage";
 import type { AuthSession, AuthUser } from "./types";
 
@@ -37,7 +37,10 @@ export async function refreshSession(): Promise<AuthSession | null> {
     });
     await persistSession({ accessToken: session.accessToken, refreshToken: session.refreshToken, userId: session.user.id });
     return session;
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiClientError && (err.endpointUnavailable || err.status === 0)) {
+      return null;
+    }
     await clearStoredSession();
     return null;
   }

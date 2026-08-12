@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Pressable } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { QuiloreLogo } from '@/components/quilore/QuiloreLogo';
 import { palette, radii, spacing, touchTarget, typography } from '@/constants/DesignTokens';
 import { track } from '@/lib/analytics';
-import { Pressable } from 'react-native';
+import { useAuth } from '@/context/AuthContext';
 
 const VALUE_PROPS = [
   { title: 'Form & load coaching', body: 'Voice and vision cues you can confirm before they stick.' },
@@ -14,6 +14,8 @@ const VALUE_PROPS = [
 ] as const;
 
 export default function OnboardingWelcomeScreen() {
+  const { signOut } = useAuth();
+
   useEffect(() => {
     track('onboarding_started', { source: 'welcome' });
   }, []);
@@ -41,6 +43,9 @@ export default function OnboardingWelcomeScreen() {
       <Animated.View entering={FadeInUp.delay(600).duration(400)} style={styles.actions}>
         <Pressable style={styles.primary} onPress={() => router.push('/onboarding/consent')} accessibilityRole="button">
           <Text style={styles.primaryText}>Get started</Text>
+        </Pressable>
+        <Pressable style={styles.secondary} onPress={() => void signOut()} accessibilityRole="button">
+          <Text style={styles.secondaryText}>Sign out</Text>
         </Pressable>
       </Animated.View>
     </View>
@@ -78,7 +83,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontWeight: '800', color: palette.emeraldDark, fontSize: typography.fontSize.md },
   cardBody: { marginTop: 4, color: palette.gray700, lineHeight: 20 },
-  actions: { paddingBottom: spacing.lg },
+  actions: { paddingBottom: spacing.lg, gap: spacing.md },
   primary: {
     minHeight: touchTarget.minHeight + 6,
     backgroundColor: palette.emerald,
@@ -87,4 +92,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryText: { color: palette.white, fontWeight: '800', fontSize: typography.fontSize.lg },
+  secondary: {
+    minHeight: touchTarget.minHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryText: { color: palette.gray600, fontWeight: '700', fontSize: typography.fontSize.md },
 });

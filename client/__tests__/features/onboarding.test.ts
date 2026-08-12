@@ -13,10 +13,11 @@ import {
 describe('Onboarding storage', () => {
   beforeEach(() => resetOnboardingStorageForTests());
 
-  it('tracks completion flag locally', async () => {
-    expect(await getOnboardingCompleteLocal()).toBe(false);
-    await setOnboardingCompleteLocal(true);
-    expect(await getOnboardingCompleteLocal()).toBe(true);
+  it('tracks completion flag per user', async () => {
+    expect(await getOnboardingCompleteLocal('user-a')).toBe(false);
+    await setOnboardingCompleteLocal(true, 'user-a');
+    expect(await getOnboardingCompleteLocal('user-a')).toBe(true);
+    expect(await getOnboardingCompleteLocal('user-b')).toBe(false);
   });
 
   it('persists draft baseline fields', async () => {
@@ -24,5 +25,14 @@ describe('Onboarding storage', () => {
     const draft = await getOnboardingDraft();
     expect(draft.age).toBe(28);
     expect(draft.primaryGoal).toBe('recomp');
+  });
+
+  it('merges partial draft updates', async () => {
+    await saveOnboardingDraft({ age: 28, sex: 'female', heightCm: 165 });
+    await saveOnboardingDraft({ consentsAccepted: true });
+    const draft = await getOnboardingDraft();
+    expect(draft.age).toBe(28);
+    expect(draft.heightCm).toBe(165);
+    expect(draft.consentsAccepted).toBe(true);
   });
 });

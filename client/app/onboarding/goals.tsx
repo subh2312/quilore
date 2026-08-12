@@ -48,15 +48,16 @@ export default function OnboardingGoalsScreen() {
         secondaryPrefs,
         schedulePrefs: { daysPerWeek: 4 },
       });
+      track('goal_set', { primaryGoal, coachingTone, source: 'onboarding' });
+      track('onboarding_completed', { step: 'goals' });
+      await markOnboardingComplete();
+      await clearOnboardingDraft();
+      router.replace('/(tabs)');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Saved locally — sync when online.');
+    } finally {
+      setBusy(false);
     }
-    track('goal_set', { primaryGoal, coachingTone, source: 'onboarding' });
-    track('onboarding_completed', { step: 'goals' });
-    await markOnboardingComplete();
-    await clearOnboardingDraft();
-    setBusy(false);
-    router.replace('/(tabs)');
   }
 
   return (

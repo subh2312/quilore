@@ -7,7 +7,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { AnimatedSplash } from '@/components/quilore/AnimatedSplash';
-import { AuthProvider, useProtectedRoute } from '@/context/AuthContext';
+import { AuthProvider, useAuth, useProtectedRoute } from '@/context/AuthContext';
 import { hydrateFromDatabase } from '@/lib/offline/store';
 
 export { ErrorBoundary } from 'expo-router';
@@ -51,9 +51,10 @@ export default function RootLayout() {
 
 function RootLayoutNav({ splashDone }: { splashDone: boolean }) {
   const colorScheme = useColorScheme();
-  useProtectedRoute(splashDone);
+  const { isLoading } = useAuth();
+  useProtectedRoute(splashDone && !isLoading);
 
-  if (!splashDone) {
+  if (!splashDone || isLoading) {
     return <View style={{ flex: 1, backgroundColor: '#059669' }} />;
   }
 

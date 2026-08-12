@@ -111,7 +111,7 @@ export async function savePrivacyPreferences(
 
 export async function resolveOnboardingComplete(userId: string): Promise<boolean> {
   const { getOnboardingCompleteLocal } = await import('@/lib/onboarding/storage');
-  if (await getOnboardingCompleteLocal()) return true;
+  if (await getOnboardingCompleteLocal(userId)) return true;
   try {
     const profile = await fetchProfile(userId);
     if (!profile?.age || !profile.sex) return false;
