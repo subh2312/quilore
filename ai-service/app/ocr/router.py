@@ -1,9 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.ocr.mapper import map_ocr_text_to_schema
+from app.security.internal_auth import require_internal_token
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_internal_token)])
 
 
 class OcrMapRequest(BaseModel):

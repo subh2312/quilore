@@ -41,3 +41,18 @@ def test_invoke_fails_closed_when_token_not_configured(monkeypatch):
     )
     assert response.status_code == 503
     assert response.json()["detail"] == "internal_api_token_not_configured"
+
+
+def test_nutrition_and_ocr_routes_require_internal_token(monkeypatch):
+    monkeypatch.setattr(settings, "internal_api_token", "secure-worker-token")
+    auth_headers = {"Authorization": "Bearer secure-worker-token"}
+
+    for method, path, kwargs in (
+        ("post", "/ai/nutrition/food-quality", {"json": {"dishes": ["dal"]}}),
+        ("post", "/ai/ocr/map-to-schema", {"json": {"text": "Squat 3x5"}}),
+    ):
+        missing = getattr(client, method)(path, **kwargs)
+        assert missing.status_code == 401
+
+        authorized = getattr(client, method)(path, headers=auth_headers, **kwargs)
+        assert authorized.status_code == 200

@@ -27,8 +27,12 @@ def test_ocr_map_to_schema_highlights_unresolved():
     assert mapped["unresolved"]
 
 
-def test_ocr_http_endpoint():
-    res = client.post("/ai/ocr/map-to-schema", json={"text": "Bench 3x8 @ 60kg"})
+def test_ocr_http_endpoint(internal_auth_headers):
+    res = client.post(
+        "/ai/ocr/map-to-schema",
+        json={"text": "Bench 3x8 @ 60kg"},
+        headers=internal_auth_headers,
+    )
     assert res.status_code == 200
     assert res.json()["exercises"][0]["name"].lower().startswith("bench")
 
