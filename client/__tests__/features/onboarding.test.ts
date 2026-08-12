@@ -3,12 +3,18 @@
  */
 
 import {
+  enqueuePendingConsent,
   getOnboardingCompleteLocal,
   getOnboardingDraft,
+  getPendingConsents,
   resetOnboardingStorageForTests,
   saveOnboardingDraft,
   setOnboardingCompleteLocal,
 } from '../../lib/onboarding/storage';
+
+jest.mock('../../lib/appVersion', () => ({
+  getAppVersion: () => '0.1.0',
+}));
 
 const USER_A = 'user-a';
 const USER_B = 'user-b';
@@ -47,5 +53,69 @@ describe('Onboarding storage', () => {
     expect(draftB.age).toBeUndefined();
     expect(draftB.injuriesInfo).toBeUndefined();
     expect(draftB.consentsAccepted).toBe(true);
+  });
+
+  it('queues pending consents per user without cross-account leak', async () => {
+    await enqueuePendingConsent(USER_A, {
+      consentType: 'terms_of_use',
+      accepted: true,
+      version: '1.0',
+      appVersion: '0.1.0',
+    });
+    expect(await getPendingConsents(USER_A)).toHaveLength(1);
+    expect(await getPendingConsents(USER_B)).toEqual([]);
+  });
+});
+
+describe('Offline consent re-validation', () => {
+  const globalFetch = global.fetch;
+
+  beforeEach(() => {
+    resetOnboardingStorageForTests();
+  });
+
+  afterEach(() => {
+    global.fetch = globalFetch;
+    resetOnboardingStorageForTests();
+  });
+
+  it('queues required consent when Spring Boot is unavailable', async () => {
+    const { recordConsent } = await import('../../lib/api/profile');
+    global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
+
+    const result = await recordConsent(USER_A, 'terms_of_use', true);
+    expect(result).toEqual(
+      expect.objectContaining({ consentType: 'terms_of_use', offline: true }),
+    );
+    expect(await getPendingConsents(USER_A)).toEqual([
+      expect.objectContaining({ consentType: 'terms_of_use', accepted: true }),
+    ]);
+  });
+
+  it('flushes pending consents once the backend is reachable', async () => {
+    const { flushPendingConsents } = await import('../../lib/api/profile');
+    await enqueuePendingConsent(USER_A, {
+      consentType: 'terms_of_use',
+      accepted: true,
+      version: '1.0',
+      appVersion: '0.1.0',
+    });
+    await enqueuePendingConsent(USER_A, {
+      consentType: 'ai_editable_disclaimer',
+      accepted: true,
+      version: '1.0',
+      appVersion: '0.1.0',
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ accepted: true }),
+    });
+
+    const outcome = await flushPendingConsents(USER_A);
+    expect(outcome).toEqual({ flushed: 2, remaining: 0 });
+    expect(await getPendingConsents(USER_A)).toEqual([]);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 });

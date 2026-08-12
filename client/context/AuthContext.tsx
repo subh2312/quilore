@@ -21,7 +21,7 @@ import {
   getStoredRefreshToken,
   clearStoredSession,
 } from '@/lib/api/authStorage';
-import { resolveOnboardingComplete } from '@/lib/api/profile';
+import { flushPendingConsents, resolveOnboardingComplete } from '@/lib/api/profile';
 import { enforceInactivityTimeout } from '@/lib/api/sessionActivity';
 import { clearOnboardingCompleteLocal, setOnboardingCompleteLocal } from '@/lib/onboarding/storage';
 import type { AuthUser } from '@/lib/api/types';
@@ -40,6 +40,15 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function hydrateSession(user: AuthUser): Promise<{ user: AuthUser; onboardingComplete: boolean }> {
+  // Re-validate offline-accepted consents against Spring Boot before treating session as settled.
+  await flushPendingConsents(user.id);
+  return {
+    user,
+    onboardingComplete: await resolveOnboardingComplete(user.id),
+  };
+}
+
 async function loadAuthState(): Promise<{ user: AuthUser | null; onboardingComplete: boolean }> {
   try {
     if (await enforceInactivityTimeout()) {
@@ -49,16 +58,13 @@ async function loadAuthState(): Promise<{ user: AuthUser | null; onboardingCompl
     if (refreshToken) {
       const session = await refreshSession();
       if (session?.user) {
-        return {
-          user: session.user,
-          onboardingComplete: await resolveOnboardingComplete(session.user.id),
-        };
+        return hydrateSession(session.user);
       }
     }
     const accessToken = await getStoredAccessToken();
     if (accessToken) {
       const me = await fetchMe();
-      return { user: me, onboardingComplete: await resolveOnboardingComplete(me.id) };
+      return hydrateSession(me);
     }
     return { user: null, onboardingComplete: false };
   } catch {
@@ -108,14 +114,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     const session = await apiLogin(email, password);
-    setUser(session.user);
-    const complete = await resolveOnboardingComplete(session.user.id);
-    setOnboardingComplete(complete);
-    return complete;
+    const hydrated = await hydrateSession(session.user);
+    setUser(hydrated.user);
+    setOnboardingComplete(hydrated.onboardingComplete);
+    return hydrated.onboardingComplete;
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, displayName: string) => {
     const session = await apiRegister(email, password, displayName);
+    await flushPendingConsents(session.user.id);
     setUser(session.user);
     setOnboardingComplete(false);
   }, []);

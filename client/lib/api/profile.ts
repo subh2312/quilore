@@ -1,4 +1,4 @@
-import { getAppVersion } from '@/lib/appVersion';
+import { getAppVersion } from '../appVersion';
 import { apiRequest, ApiClientError } from './client';
 
 export type UserProfile = {
@@ -78,17 +78,63 @@ export async function recordConsent(
   accepted: boolean,
   version = '1.0',
 ) {
+  const appVersion = getAppVersion();
+  const {
+    enqueuePendingConsent,
+    removePendingConsent,
+  } = await import('../onboarding/storage');
   try {
-    return await apiRequest(`/api/privacy/consents/${userId}`, {
+    const result = await apiRequest(`/api/privacy/consents/${userId}`, {
       method: 'POST',
-      body: { consentType, version, accepted, appVersion: getAppVersion() },
+      body: { consentType, version, accepted, appVersion },
     });
+    await removePendingConsent(userId, consentType);
+    return result;
   } catch (err) {
     if (err instanceof ApiClientError && err.endpointUnavailable) {
-      return { accepted, consentType, offline: true };
+      // Queue for durable re-validation once Spring Boot is reachable again.
+      await enqueuePendingConsent(userId, { consentType, accepted, version, appVersion });
+      return { accepted, consentType, offline: true as const };
     }
     throw err;
   }
+}
+
+/**
+ * Re-post any required consents accepted while the backend was unavailable.
+ * Called on session restore / sign-in so offline onboarding cannot permanently
+ * bypass server-side consent persistence.
+ */
+export async function flushPendingConsents(userId: string): Promise<{ flushed: number; remaining: number }> {
+  const { getPendingConsents, removePendingConsent } = await import('../onboarding/storage');
+  const pending = await getPendingConsents(userId);
+  if (!pending.length) return { flushed: 0, remaining: 0 };
+
+  let flushed = 0;
+  for (const item of pending) {
+    try {
+      await apiRequest(`/api/privacy/consents/${userId}`, {
+        method: 'POST',
+        body: {
+          consentType: item.consentType,
+          version: item.version,
+          accepted: item.accepted,
+          appVersion: item.appVersion,
+        },
+      });
+      await removePendingConsent(userId, item.consentType);
+      flushed += 1;
+    } catch (err) {
+      if (err instanceof ApiClientError && err.endpointUnavailable) {
+        break;
+      }
+      // Leave item queued for a later retry on non-transient failures too —
+      // consent must eventually land on Spring Boot.
+    }
+  }
+
+  const remaining = (await getPendingConsents(userId)).length;
+  return { flushed, remaining };
 }
 
 export async function savePrivacyPreferences(
@@ -113,7 +159,7 @@ export async function savePrivacyPreferences(
 }
 
 export async function resolveOnboardingComplete(userId: string): Promise<boolean> {
-  const { getOnboardingCompleteLocal } = await import('@/lib/onboarding/storage');
+  const { getOnboardingCompleteLocal } = await import('../onboarding/storage');
   if (await getOnboardingCompleteLocal(userId)) return true;
   try {
     const profile = await fetchProfile(userId);

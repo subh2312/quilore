@@ -4,6 +4,7 @@
 
 const ONBOARDING_COMPLETE_KEY = 'quilore_onboarding_complete_v1';
 const ONBOARDING_DRAFT_KEY = 'quilore_onboarding_draft_v1';
+const PENDING_CONSENTS_KEY = 'quilore_pending_consents_v1';
 
 const memory: Record<string, string | undefined> = {};
 
@@ -45,12 +46,24 @@ export type OnboardingDraft = {
   consentsAccepted?: boolean;
 };
 
+/** Required consent captured offline; must be flushed when Spring Boot is reachable. */
+export type PendingConsent = {
+  consentType: string;
+  accepted: boolean;
+  version: string;
+  appVersion: string;
+};
+
 function onboardingCompleteKey(userId: string) {
   return `${ONBOARDING_COMPLETE_KEY}_${userId}`;
 }
 
 function onboardingDraftKey(userId: string) {
   return `${ONBOARDING_DRAFT_KEY}_${userId}`;
+}
+
+function pendingConsentsKey(userId: string) {
+  return `${PENDING_CONSENTS_KEY}_${userId}`;
 }
 
 export async function getOnboardingCompleteLocal(userId: string): Promise<boolean> {
@@ -85,9 +98,38 @@ export async function clearOnboardingDraft(userId: string) {
   await secureSet(onboardingDraftKey(userId), null);
 }
 
+export async function getPendingConsents(userId: string): Promise<PendingConsent[]> {
+  const raw = await secureGet(pendingConsentsKey(userId));
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as PendingConsent[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function enqueuePendingConsent(userId: string, item: PendingConsent) {
+  const existing = await getPendingConsents(userId);
+  const next = [...existing.filter((c) => c.consentType !== item.consentType), item];
+  await secureSet(pendingConsentsKey(userId), JSON.stringify(next));
+}
+
+export async function removePendingConsent(userId: string, consentType: string) {
+  const existing = await getPendingConsents(userId);
+  const next = existing.filter((c) => c.consentType !== consentType);
+  await secureSet(pendingConsentsKey(userId), next.length ? JSON.stringify(next) : null);
+}
+
+export async function clearPendingConsents(userId: string) {
+  await secureSet(pendingConsentsKey(userId), null);
+}
+
 /** Test helper */
 export function resetOnboardingStorageForTests() {
   for (const key of Object.keys(memory)) {
-    if (key.startsWith('quilore_onboarding_')) delete memory[key];
+    if (key.startsWith('quilore_onboarding_') || key.startsWith('quilore_pending_consents_')) {
+      delete memory[key];
+    }
   }
 }
