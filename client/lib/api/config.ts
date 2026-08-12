@@ -1,13 +1,15 @@
-/**
- * Spring Boot API base URL — never call FastAI directly from the client.
- */
+export const DEFAULT_API_BASE = "http://localhost:8080";
+
+export const UAT_MOCK_RECEIPT = "UAT_MOCK_RECEIPT";
+
+export const OCR_CONFIDENCE_THRESHOLD = 0.55;
+
 export function getApiBaseUrl(): string {
-  const url = process.env.EXPO_PUBLIC_API_URL?.trim();
-  if (url) return url.replace(/\/$/, '');
-  return 'http://localhost:8080';
+  const raw = process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_API_BASE;
+  return raw.replace(/\/$/, "");
 }
 
-export const UAT_MOCK_RECEIPT = 'UAT_MOCK_RECEIPT';
-
-/** Low-confidence threshold for on-device OCR before NIM fallback via backend. */
-export const OCR_CONFIDENCE_THRESHOLD = 0.65;
+export function getSentryDsn(): string | undefined {
+  const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+  return dsn && dsn.length > 0 ? dsn : undefined;
+}

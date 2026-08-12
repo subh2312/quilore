@@ -18,47 +18,11 @@ EXPO_PUBLIC_API_URL=http://192.168.1.100:8080
 # EXPO_PUBLIC_SENTRY_DSN=https://...
 ```
 
-## Option A — EAS cloud build (APK)
+## EAS preview APK
 
 ```bash
 cd client
-npm install -g eas-cli
-eas login
-eas build --profile preview --platform android
+npx eas-cli build -p android --profile preview
 ```
 
-The `preview` profile in `eas.json` outputs an **APK** (`buildType: apk`) for sideload.
-
-Download the artifact from the EAS dashboard and install:
-
-```bash
-adb install quilore-preview.apk
-```
-
-## Option B — Local release APK
-
-```bash
-cd client
-npm install
-npx expo prebuild --platform android
-cd android
-./gradlew assembleRelease
-```
-
-APK path: `android/app/build/outputs/apk/release/app-release.apk`
-
-Sign with your keystore before distributing outside dev (UAT can use debug signing locally).
-
-## Pointing at Raspberry Pi / staging
-
-1. Set `EXPO_PUBLIC_API_URL` to the Pi LAN IP before build (baked into JS bundle at build time).
-2. Ensure gym Wi‑Fi allows HTTP to Pi port 8080, or use Cloudflare Tunnel + HTTPS URL.
-3. Log in via the app once auth UI lands; until then, mock IAP uses `UAT_MOCK_RECEIPT` when backend endpoints exist.
-
-## Verify
-
-- Workout tab: voice stub, PDF import, session summary card after finish
-- Chat: calls `POST /api/coach/chat` (local fallback if cursor branch not merged)
-- Nutrition: `POST /api/nutrition/meals/calculate` + food-quality fallback
-- Profile: mock purchase/restore → billing API
-- Admin link (SUPPORT role): `/admin/food-aliases`
+See `eas.json` for the preview profile (`buildType: apk`).

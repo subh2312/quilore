@@ -1,32 +1,28 @@
-import { apiRequest } from './client';
-import { getStoredUserId } from './authStorage';
-import { pendingMutations } from '@/lib/offline/store';
-import type { SyncPushResponse } from './types';
+import { apiRequest, ApiClientError } from "./client";
+import { getStoredUserId } from "./authStorage";
+import { markSynced, pendingMutations } from "../offline/store";
 
-export async function pushPendingMutations(): Promise<SyncPushResponse | null> {
+export async function pushPendingMutations(): Promise<{ applied: number }> {
   const userId = await getStoredUserId();
-  if (!userId) return null;
-
-  const mutations = pendingMutations().map((m) => ({
-    id: m.id,
-    collection: m.collection,
-    op: m.op,
-    payload: m.payload,
-    createdAt: m.createdAt,
-  }));
-
-  if (mutations.length === 0) return null;
-
-  return apiRequest<SyncPushResponse>(`/api/sync/${userId}/push`, {
-    method: 'POST',
-    body: { mutations },
-  });
-}
-
-export async function pullRemoteChanges(lastPulledAt = 0) {
-  const userId = await getStoredUserId();
-  if (!userId) return null;
-  return apiRequest<{ changes: unknown[]; timestamp: number }>(
-    `/api/sync/${userId}/pull?lastPulledAt=${lastPulledAt}`,
-  );
+  const mutations = pendingMutations();
+  if (mutations.length === 0) return { applied: 0 };
+  try {
+    if (!userId) throw new ApiClientError({ status: 401, message: "offline", endpointUnavailable: true });
+    await apiRequest(`/api/sync/${userId}/push`, {
+      method: "POST",
+      body: {
+        mutations: mutations.map((m) => ({
+          id: m.id,
+          collection: m.collection,
+          op: m.op,
+          payload: m.payload,
+        })),
+      },
+    });
+    markSynced(mutations.map((m) => m.id));
+    return { applied: mutations.length };
+  } catch (err) {
+    if (err instanceof ApiClientError && err.endpointUnavailable) return { applied: 0 };
+    throw err;
+  }
 }
