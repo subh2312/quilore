@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** copilot
 - **PR:** https://github.com/subh2312/quilore/pull/9
+- **What:** Fail-closed required consent writes — no more `offline: true` success; re-validate required consents from Spring Boot before tab access / `markOnboardingComplete`.
+- **Why:** Agentic Security Review (MEDIUM) on PR #9: mandatory consent enforcement could be bypassed when backend was unavailable because `recordConsent` treated outages as success and onboarding proceeded.
+- **How:** `recordConsent` now throws on `endpointUnavailable`; `verifyRequiredConsents` + `resolveOnboardingComplete` gate tabs on GET `/api/privacy/consents`; legacy pending-queue flush retained only as migration; Jest contracts for fail-closed + re-validation.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/9
 - **What:** Resolved remaining PR #9 review threads — inactivity/onboarding consistency (prior commits), consent `appVersion` via `getAppVersion()`, logout clears tokens after concurrent refresh while preserving quick re-login.
 - **Why:** Bugbot/Security flagged inconsistent 30-day inactivity onboarding fallback, reverted hard-coded consent audit version, and logout leaving rotated refresh tokens on device when refresh raced logout.
 - **How:** Pulled `79e0dc7`/`d500cb1` (inactivity + appVersion); added `markNewSessionEstablished()` on login/register so `logout()` always clears stored credentials unless a new session was established during the in-flight request; Jest contracts for both paths.

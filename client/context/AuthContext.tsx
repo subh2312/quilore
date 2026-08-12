@@ -21,7 +21,11 @@ import {
   getStoredRefreshToken,
   clearStoredSession,
 } from '@/lib/api/authStorage';
-import { flushPendingConsents, resolveOnboardingComplete } from '@/lib/api/profile';
+import {
+  flushPendingConsents,
+  resolveOnboardingComplete,
+  verifyRequiredConsents,
+} from '@/lib/api/profile';
 import { enforceInactivityTimeout } from '@/lib/api/sessionActivity';
 import { clearOnboardingCompleteLocal, setOnboardingCompleteLocal } from '@/lib/onboarding/storage';
 import type { AuthUser } from '@/lib/api/types';
@@ -41,7 +45,8 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function hydrateSession(user: AuthUser): Promise<{ user: AuthUser; onboardingComplete: boolean }> {
-  // Re-validate offline-accepted consents against Spring Boot before treating session as settled.
+  // Flush any legacy offline consent queue, then re-validate required consents
+  // against Spring Boot before granting tab access.
   await flushPendingConsents(user.id);
   return {
     user,
@@ -154,6 +159,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const markOnboardingComplete = useCallback(async () => {
     if (!user) return;
+    await flushPendingConsents(user.id);
+    const consentsOk = await verifyRequiredConsents(user.id);
+    if (!consentsOk) {
+      throw new Error('Required consents must be saved on the server before continuing.');
+    }
     await setOnboardingCompleteLocal(true, user.id);
     setOnboardingComplete(true);
   }, [user]);

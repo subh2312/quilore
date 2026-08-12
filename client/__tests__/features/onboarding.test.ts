@@ -1,5 +1,5 @@
 /**
- * Onboarding local storage contracts.
+ * Onboarding local storage + required-consent fail-closed contracts.
  */
 
 import {
@@ -67,7 +67,7 @@ describe('Onboarding storage', () => {
   });
 });
 
-describe('Offline consent re-validation', () => {
+describe('Required consent fail-closed', () => {
   const globalFetch = global.fetch;
 
   beforeEach(() => {
@@ -79,20 +79,17 @@ describe('Offline consent re-validation', () => {
     resetOnboardingStorageForTests();
   });
 
-  it('queues required consent when Spring Boot is unavailable', async () => {
+  it('fails required consent writes when Spring Boot is unavailable', async () => {
     const { recordConsent } = await import('../../lib/api/profile');
     global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
 
-    const result = await recordConsent(USER_A, 'terms_of_use', true);
-    expect(result).toEqual(
-      expect.objectContaining({ consentType: 'terms_of_use', offline: true }),
-    );
-    expect(await getPendingConsents(USER_A)).toEqual([
-      expect.objectContaining({ consentType: 'terms_of_use', accepted: true }),
-    ]);
+    await expect(recordConsent(USER_A, 'terms_of_use', true)).rejects.toMatchObject({
+      endpointUnavailable: true,
+    });
+    expect(await getPendingConsents(USER_A)).toEqual([]);
   });
 
-  it('flushes pending consents once the backend is reachable', async () => {
+  it('flushes legacy pending consents once the backend is reachable', async () => {
     const { flushPendingConsents } = await import('../../lib/api/profile');
     await enqueuePendingConsent(USER_A, {
       consentType: 'terms_of_use',
@@ -117,5 +114,48 @@ describe('Offline consent re-validation', () => {
     expect(outcome).toEqual({ flushed: 2, remaining: 0 });
     expect(await getPendingConsents(USER_A)).toEqual([]);
     expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks onboarding complete when required server consents are missing', async () => {
+    const { resolveOnboardingComplete } = await import('../../lib/api/profile');
+    await setOnboardingCompleteLocal(true, USER_A);
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [{ consentType: 'terms_of_use', accepted: true }],
+    });
+
+    expect(await resolveOnboardingComplete(USER_A)).toBe(false);
+  });
+
+  it('grants onboarding complete only after all required consents are on the server', async () => {
+    const { resolveOnboardingComplete } = await import('../../lib/api/profile');
+    await setOnboardingCompleteLocal(true, USER_A);
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { consentType: 'terms_of_use', accepted: true },
+        { consentType: 'ai_editable_disclaimer', accepted: true },
+        { consentType: 'injury_risk_flag_disclaimer', accepted: true },
+      ],
+    });
+
+    expect(await resolveOnboardingComplete(USER_A)).toBe(true);
+  });
+
+  it('denies tab access while a legacy offline consent queue remains', async () => {
+    const { resolveOnboardingComplete } = await import('../../lib/api/profile');
+    await setOnboardingCompleteLocal(true, USER_A);
+    await enqueuePendingConsent(USER_A, {
+      consentType: 'terms_of_use',
+      accepted: true,
+      version: '1.0',
+      appVersion: '0.1.0',
+    });
+
+    expect(await resolveOnboardingComplete(USER_A)).toBe(false);
   });
 });

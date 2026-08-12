@@ -34,6 +34,20 @@ export type GoalSnapshot = {
   version?: number;
 };
 
+export type ConsentRecord = {
+  consentType: string;
+  accepted: boolean;
+  version?: string;
+  appVersion?: string;
+};
+
+/** Mandatory onboarding consents that must exist on Spring Boot before tab access. */
+export const REQUIRED_CONSENT_TYPES = [
+  'terms_of_use',
+  'ai_editable_disclaimer',
+  'injury_risk_flag_disclaimer',
+] as const;
+
 export async function upsertProfile(userId: string, input: ProfileUpsertInput): Promise<UserProfile> {
   return apiRequest<UserProfile>(`/api/profiles/${userId}`, { method: 'PUT', body: input });
 }
@@ -72,6 +86,10 @@ export async function fetchCurrentGoal(userId: string): Promise<GoalSnapshot> {
   }
 }
 
+/**
+ * Persist a consent to Spring Boot. Required consents are fail-closed: backend
+ * unavailability throws (never treated as success / offline:true).
+ */
 export async function recordConsent(
   userId: string,
   consentType: string,
@@ -79,31 +97,51 @@ export async function recordConsent(
   version = '1.0',
 ) {
   const appVersion = getAppVersion();
-  const {
-    enqueuePendingConsent,
-    removePendingConsent,
-  } = await import('../onboarding/storage');
+  const { removePendingConsent } = await import('../onboarding/storage');
+  const result = await apiRequest(`/api/privacy/consents/${userId}`, {
+    method: 'POST',
+    body: { consentType, version, accepted, appVersion },
+  });
+  await removePendingConsent(userId, consentType);
+  return result;
+}
+
+export async function fetchConsents(userId: string): Promise<ConsentRecord[]> {
+  return apiRequest<ConsentRecord[]>(`/api/privacy/consents/${userId}`);
+}
+
+export function hasAcceptedRequiredConsents(records: ConsentRecord[]): boolean {
+  return REQUIRED_CONSENT_TYPES.every((type) =>
+    records.some((c) => c.consentType === type && c.accepted === true),
+  );
+}
+
+/**
+ * Re-validate mandatory consents against Spring Boot.
+ * - Online: requires all REQUIRED_CONSENT_TYPES accepted server-side.
+ * - Offline with no pending queue: allow only if local onboarding already completed
+ *   (implies a prior successful online consent write after fail-closed enforcement).
+ * - Pending offline queue remaining: deny access until flushed.
+ */
+export async function verifyRequiredConsents(userId: string): Promise<boolean> {
+  const { getOnboardingCompleteLocal, getPendingConsents } = await import('../onboarding/storage');
+  if ((await getPendingConsents(userId)).length > 0) {
+    return false;
+  }
   try {
-    const result = await apiRequest(`/api/privacy/consents/${userId}`, {
-      method: 'POST',
-      body: { consentType, version, accepted, appVersion },
-    });
-    await removePendingConsent(userId, consentType);
-    return result;
+    const records = await fetchConsents(userId);
+    return hasAcceptedRequiredConsents(records);
   } catch (err) {
     if (err instanceof ApiClientError && err.endpointUnavailable) {
-      // Queue for durable re-validation once Spring Boot is reachable again.
-      await enqueuePendingConsent(userId, { consentType, accepted, version, appVersion });
-      return { accepted, consentType, offline: true as const };
+      return (await getOnboardingCompleteLocal(userId)) === true;
     }
-    throw err;
+    return false;
   }
 }
 
 /**
- * Re-post any required consents accepted while the backend was unavailable.
- * Called on session restore / sign-in so offline onboarding cannot permanently
- * bypass server-side consent persistence.
+ * Re-post any consents left in the legacy offline queue (from an earlier
+ * queue-and-proceed path). New required consent writes no longer enqueue.
  */
 export async function flushPendingConsents(userId: string): Promise<{ flushed: number; remaining: number }> {
   const { getPendingConsents, removePendingConsent } = await import('../onboarding/storage');
@@ -128,8 +166,7 @@ export async function flushPendingConsents(userId: string): Promise<{ flushed: n
       if (err instanceof ApiClientError && err.endpointUnavailable) {
         break;
       }
-      // Leave item queued for a later retry on non-transient failures too —
-      // consent must eventually land on Spring Boot.
+      // Leave item queued for a later retry — consent must land on Spring Boot.
     }
   }
 
@@ -152,7 +189,8 @@ export async function savePrivacyPreferences(
     });
   } catch (err) {
     if (err instanceof ApiClientError && err.endpointUnavailable) {
-      return { ...prefs, offline: true };
+      // Optional prefs may degrade offline; required consents must not.
+      return { ...prefs, offline: true as const };
     }
     throw err;
   }
@@ -160,13 +198,17 @@ export async function savePrivacyPreferences(
 
 export async function resolveOnboardingComplete(userId: string): Promise<boolean> {
   const { getOnboardingCompleteLocal } = await import('../onboarding/storage');
-  if (await getOnboardingCompleteLocal(userId)) return true;
-  try {
-    const profile = await fetchProfile(userId);
-    if (!profile?.age || !profile.sex) return false;
-    const goal = await fetchCurrentGoal(userId);
-    return goal.hasGoal === true || Boolean(goal.primaryGoal);
-  } catch {
-    return false;
+  let baselineComplete = await getOnboardingCompleteLocal(userId);
+  if (!baselineComplete) {
+    try {
+      const profile = await fetchProfile(userId);
+      if (!profile?.age || !profile.sex) return false;
+      const goal = await fetchCurrentGoal(userId);
+      baselineComplete = goal.hasGoal === true || Boolean(goal.primaryGoal);
+    } catch {
+      return false;
+    }
   }
+  if (!baselineComplete) return false;
+  return verifyRequiredConsents(userId);
 }

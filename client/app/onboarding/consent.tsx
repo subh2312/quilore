@@ -33,18 +33,26 @@ export default function ConsentOnboardingScreen() {
       setAnalyticsConsent(analytics);
       setCrashReportingEnabled(crash);
 
+      // Required consents are fail-closed: recordConsent throws when Spring Boot is unavailable.
       await Promise.all([
         recordConsent(user.id, 'terms_of_use', true),
         recordConsent(user.id, 'ai_editable_disclaimer', true),
         recordConsent(user.id, 'injury_risk_flag_disclaimer', true),
-        savePrivacyPreferences(user.id, { analyticsOptIn: analytics, crashReportingOptIn: crash }),
       ]);
+      // Optional prefs may degrade offline without blocking onboarding.
+      await savePrivacyPreferences(user.id, { analyticsOptIn: analytics, crashReportingOptIn: crash });
 
       await saveOnboardingDraft(user.id, { consentsAccepted: true });
       track('onboarding_completed', { step: 'consent', analytics, crash });
       router.push('/onboarding/profile-baseline');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save consent. Please try again.');
+      const message =
+        err instanceof Error && /network|offline|unavailable/i.test(err.message)
+          ? 'Server unavailable. Required consents must be saved online before continuing.'
+          : err instanceof Error
+            ? err.message
+            : 'Could not save consent. Please try again.';
+      setError(message);
     } finally {
       setBusy(false);
     }
