@@ -1,9 +1,11 @@
-"""OCR text → workout schema mapping via AI gateway contracts (not direct client)."""
+"""OCR text → workout schema mapping via NIM with regex fallback."""
 
 from __future__ import annotations
 
 import re
 from typing import Any
+
+from app.providers import nim_client
 
 EXERCISE_LINE = re.compile(
     r"^(?P<name>[A-Za-z][A-Za-z0-9 \-/]+?)\s+"
@@ -13,7 +15,7 @@ EXERCISE_LINE = re.compile(
 )
 
 
-def map_ocr_text_to_schema(text: str) -> dict[str, Any]:
+def _regex_map(text: str) -> dict[str, Any]:
     lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
     exercises: list[dict[str, Any]] = []
     unresolved: list[dict[str, Any]] = []
@@ -34,11 +36,31 @@ def map_ocr_text_to_schema(text: str) -> dict[str, Any]:
             }
         )
     return {
-        "source": "ocr_text",
+        "source": "ocr_text_regex",
         "exercises": exercises,
         "unresolved": unresolved,
         "lowConfidenceHighlighted": True,
         "userConfirmationRequired": True,
         "editable": True,
-        "message": "OCR draft mapped to schema — review and edit before save.",
+        "llmMapped": False,
+        "message": "OCR draft mapped via regex fallback — review and edit before save.",
     }
+
+
+def map_ocr_text_to_schema(text: str) -> dict[str, Any]:
+    llm = nim_client.map_ocr_with_llm(text)
+    if llm.get("ok") and llm.get("schema"):
+        schema = llm["schema"]
+        return {
+            "source": "ocr_text_nim",
+            "exercises": schema.get("exercises", []),
+            "unresolved": schema.get("unresolved", []),
+            "lowConfidenceHighlighted": True,
+            "userConfirmationRequired": True,
+            "editable": True,
+            "llmMapped": True,
+            "message": "OCR draft mapped via NIM — review and edit before save.",
+        }
+    mapped = _regex_map(text)
+    mapped["degraded"] = True
+    return mapped

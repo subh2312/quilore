@@ -5,27 +5,23 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """AI service configuration — loaded from environment variables or .env file."""
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    # ─── Service ─────────────────────────────────────────────
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
     port: int = 8000
     # Shared secret for privileged service-to-service routes (e.g. queue workers).
     internal_api_token: str = Field(default="", validation_alias="AI_SERVICE_INTERNAL_TOKEN")
 
     # ─── Database (read-only access for RAG / embeddings) ────
     database_url: str = "postgresql://quilore:quilore_dev_pass@localhost:5432/quilore"
-
-    # ─── AI Provider API Keys ────────────────────────────────
     groq_api_key: str = ""
     openrouter_api_key: str = ""
     hf_api_token: str = ""
     nvidia_nim_api_key: str = ""
+    nim_coach_model: str = "nvidia/nemotron-3.5-lightning-30b-a3b"
+    nim_coach_alt: str = "google/gemma-4-31b-it"
+    nim_escalation_model: str = "zhipuai/glm-5.2"
+    nim_ocr_model: str = "nvidia/nemotron-ocr-v2"
+    nim_embed_model: str = "nvidia/nemotron-3-embed-1b"
+    nim_safety_model: str = "nvidia/nemotron-3.5-content-safety"
 
 
 settings = Settings()

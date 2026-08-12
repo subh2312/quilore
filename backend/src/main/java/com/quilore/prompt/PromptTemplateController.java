@@ -22,7 +22,8 @@ public class PromptTemplateController {
         this.service = service;
     }
 
-    @GetMapping("/prompts/{key}/active")
+    @GetMapping("/admin/prompts/{key}/active")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> active(@PathVariable String key) {
         var p = service.getActive(key);
         return ResponseEntity.ok(Map.of(

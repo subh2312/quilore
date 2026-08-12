@@ -13,6 +13,8 @@ from threading import Lock
 from typing import Any
 from uuid import uuid4
 
+from app.providers import nim_client
+
 
 class JobStatus(StrEnum):
     QUEUED = "queued"
@@ -35,6 +37,42 @@ class Job:
     error: str | None = None
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
+def _execute_job(job: Job) -> dict[str, Any]:
+    if job.task_type == "program_generation":
+        prompt = str(job.payload.get("prompt") or job.payload.get("goal") or "general fitness")
+        if nim_client.nim_configured():
+            result = nim_client.coach_reply(
+                f"Design a weekly training program as JSON. Goal: {prompt}",
+                escalate=bool(job.payload.get("escalate")),
+            )
+            if result.get("ok"):
+                return {
+                    "status": "completed",
+                    "programText": result.get("text"),
+                    "model": result.get("model"),
+                    "editable": True,
+                    "userConfirmationRequired": True,
+                    "degraded": False,
+                }
+        return {
+            "status": "completed_stub",
+            "programText": "4-day starter split — edit before saving.",
+            "editable": True,
+            "userConfirmationRequired": True,
+            "degraded": True,
+        }
+    if job.task_type == "ocr_cleanup":
+        from app.ocr.mapper import map_ocr_text_to_schema
+
+        return map_ocr_text_to_schema(str(job.payload.get("text", "")))
+    if job.task_type == "meal_batch":
+        from app.nutrition.food_quality import food_quality_feedback
+
+        dishes = job.payload.get("dishes") or []
+        return food_quality_feedback([str(d) for d in dishes], job.payload.get("notes"))
+    return {"status": "completed", "editable": True, "degraded": True}
 
 
 class AiJobQueue:
@@ -74,15 +112,20 @@ class AiJobQueue:
             job.status = JobStatus.RUNNING
             job.attempts += 1
             job.updated_at = datetime.now(UTC).isoformat()
-        # Deterministic stub completion — live adapters remain deferred (PR #5 Path B).
-        with self._lock:
-            job.status = JobStatus.COMPLETED
-            job.result = {
-                "status": "queued_complete_stub",
-                "note": "Background queue accepted work; live AI adapters remain deferred.",
-                "editable": True,
-            }
-            job.updated_at = datetime.now(UTC).isoformat()
+        try:
+            result = _execute_job(job)
+            with self._lock:
+                job.status = JobStatus.COMPLETED
+                job.result = result
+                job.updated_at = datetime.now(UTC).isoformat()
+        except Exception as exc:  # noqa: BLE001
+            with self._lock:
+                if job.attempts >= job.max_attempts:
+                    job.status = JobStatus.DEAD_LETTER
+                else:
+                    job.status = JobStatus.FAILED
+                job.error = str(exc)
+                job.updated_at = datetime.now(UTC).isoformat()
         return job
 
     def fail(self, job_id: str, error: str) -> Job | None:
