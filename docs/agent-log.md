@@ -1,6 +1,14 @@
 # Agent Log
 
 - **Date:** 2026-08-12
+- **Tool:** copilot
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/9
+- **What:** Full Profile tab (account details, editable baseline/goals/coaching prefs, logout) and 30-day inactivity auto-logout on the client; backend profile GET now returns dietary/equipment fields.
+- **Why:** Post-onboarding users need to review and edit baseline data, see account/plan context, and have dormant sessions cleared per security hygiene without inventing FastAPI auth.
+- **How:** Expanded `profile.tsx` with Spring Boot `/api/auth/me`, `/api/profiles/{userId}`, `/api/goals/{userId}`, and entitlements; added `sessionActivity.ts` persisting `quilore_last_auth_activity` on login/refresh and successful JWT API calls, enforced on AuthProvider bootstrap and AppState foreground; Jest coverage for the 30-day expiry path; extended `ProfileMetricsController.profileMap` for diet/equipment fields.
+
+- **Date:** 2026-08-12
 - **Tool:** cursor
 - **Branch:** copilot
 - **PR:** https://github.com/subh2312/quilore/pull/9

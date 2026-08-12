@@ -3,7 +3,12 @@
  */
 
 import { getApiBaseUrl, UAT_MOCK_RECEIPT, OCR_CONFIDENCE_THRESHOLD } from "../../lib/api/config";
-import { clearStoredSession, getStoredAccessToken, persistSession } from "../../lib/api/authStorage";
+import {
+  clearStoredSession,
+  getLastAuthActivityMs,
+  getStoredAccessToken,
+  persistSession,
+} from "../../lib/api/authStorage";
 import { isSupportOrAdmin } from "../../lib/api/auth";
 import { sendCoachChat } from "../../lib/api/coach";
 import { fetchFoodQuality } from "../../lib/api/nutrition";
@@ -73,6 +78,7 @@ describe("Auth register and refresh", () => {
       expect.objectContaining({ method: "POST" }),
     );
     expect(await getStoredAccessToken()).toBe("access-new");
+    expect(await getLastAuthActivityMs()).not.toBeNull();
   });
 
   it("refreshes session and clears tokens on failure", async () => {

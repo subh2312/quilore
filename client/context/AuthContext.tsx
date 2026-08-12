@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 import {
   fetchMe,
@@ -17,7 +18,8 @@ import {
 } from '@/lib/api/auth';
 import { getStoredAccessToken, getStoredRefreshToken, clearStoredSession } from '@/lib/api/authStorage';
 import { resolveOnboardingComplete } from '@/lib/api/profile';
-import { setOnboardingCompleteLocal } from '@/lib/onboarding/storage';
+import { enforceInactivityTimeout } from '@/lib/api/sessionActivity';
+import { clearOnboardingCompleteLocal, setOnboardingCompleteLocal } from '@/lib/onboarding/storage';
 import type { AuthUser } from '@/lib/api/types';
 
 type AuthContextValue = {
@@ -36,6 +38,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function loadAuthState(): Promise<{ user: AuthUser | null; onboardingComplete: boolean }> {
   try {
+    if (await enforceInactivityTimeout()) {
+      return { user: null, onboardingComplete: false };
+    }
     const refreshToken = await getStoredRefreshToken();
     if (refreshToken) {
       const session = await refreshSession();
@@ -84,6 +89,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    const onAppStateChange = (next: AppStateStatus) => {
+      if (next !== 'active') return;
+      void (async () => {
+        if (!(await enforceInactivityTimeout())) return;
+        const userId = user?.id;
+        if (userId) await clearOnboardingCompleteLocal(userId);
+        setUser(null);
+        setOnboardingComplete(false);
+      })();
+    };
+    const sub = AppState.addEventListener('change', onAppStateChange);
+    return () => sub.remove();
+  }, [user]);
+
   const signIn = useCallback(async (email: string, password: string) => {
     const session = await apiLogin(email, password);
     setUser(session.user);
@@ -100,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     const refreshToken = await getStoredRefreshToken();
+    const userId = user?.id;
     setUser(null);
     setOnboardingComplete(false);
     try {
@@ -117,7 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await clearStoredSession();
       }
     }
-  }, []);
+    if (userId) {
+      await clearOnboardingCompleteLocal(userId);
+    }
+  }, [user]);
 
   const markOnboardingComplete = useCallback(async () => {
     if (!user) return;
