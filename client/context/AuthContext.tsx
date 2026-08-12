@@ -99,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    setUser(null);
+    setOnboardingComplete(false);
     try {
       const refreshToken = await getStoredRefreshToken();
       if (refreshToken) {
@@ -106,9 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         await clearStoredSession();
       }
-    } finally {
-      setUser(null);
-      setOnboardingComplete(false);
+    } catch {
+      await clearStoredSession();
     }
   }, []);
 
