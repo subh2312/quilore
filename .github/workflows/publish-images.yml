@@ -1,7 +1,8 @@
 name: Publish — Versioned Container Images
 
-# Publishes versioned images to GHCR after CI-green merges to `dev` (staging channel)
-# and on explicit version tags (release candidates for production promotion).
+# Publishes versioned **linux/arm64** images to GHCR after CI-green merges to `dev`
+# (staging channel) and on explicit version tags (release candidates).
+# amd64 is intentionally not built — deploy targets are Raspberry Pi / ARM only.
 
 on:
   push:
@@ -102,14 +103,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Target hosts are Raspberry Pi / ARM only — never publish amd64.
+      - name: Set up QEMU (arm64 on amd64 runners)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Publish backend image
+      - name: Publish backend image (linux/arm64 only)
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
+          platforms: linux/arm64
           push: true
           tags: |
             ${{ steps.meta.outputs.backend_image }}:${{ steps.meta.outputs.version }}
@@ -119,14 +127,15 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.meta.outputs.full_sha }}
             org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+          cache-from: type=gha,scope=backend-arm64
+          cache-to: type=gha,mode=max,scope=backend-arm64
 
-      - name: Publish ai-service image
+      - name: Publish ai-service image (linux/arm64 only)
         uses: docker/build-push-action@v6
         with:
           context: ./ai-service
           file: ./ai-service/Dockerfile
+          platforms: linux/arm64
           push: true
           tags: |
             ${{ steps.meta.outputs.ai_image }}:${{ steps.meta.outputs.version }}
@@ -136,8 +145,8 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.meta.outputs.full_sha }}
             org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-          cache-from: type=gha,scope=ai-service
-          cache-to: type=gha,mode=max,scope=ai-service
+          cache-from: type=gha,scope=ai-service-arm64
+          cache-to: type=gha,mode=max,scope=ai-service-arm64
 
       - name: Write deployment pin artifact
         run: |

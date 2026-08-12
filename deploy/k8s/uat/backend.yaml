@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: quilore
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: quilore
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      # Private GHCR: create imagePullSecret quilore-ghcr and uncomment
+      # imagePullSecrets:
+      #   - name: quilore-ghcr
+      containers:
+        - name: backend
+          # Pin after publish-images.yml (linux/arm64 only)
+          image: ghcr.io/subh2312/quilore-backend:staging
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: staging
+            - name: SERVER_PORT
+              value: "8080"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/quilore
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: quilore-secrets
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quilore-secrets
+                  key: POSTGRES_PASSWORD
+            - name: MINIO_ENDPOINT
+              value: http://minio:9000
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: quilore-secrets
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quilore-secrets
+                  key: MINIO_ROOT_PASSWORD
+            - name: AI_SERVICE_URL
+              value: http://ai-service:8000
+            - name: AI_SERVICE_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: quilore-secrets
+                  key: AI_SERVICE_INTERNAL_TOKEN
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: quilore-secrets
+                  key: JWT_SECRET
+            - name: DATA_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: quilore-secrets
+                  key: DATA_ENCRYPTION_KEY
+            - name: QUILORE_ALLOW_MOCK_RECEIPTS
+              valueFrom:
+                secretKeyRef:
+                  name: quilore-secrets
+                  key: QUILORE_ALLOW_MOCK_RECEIPTS
+            - name: QUILORE_MOCK_RECEIPT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: quilore-secrets
+                  key: QUILORE_MOCK_RECEIPT_TOKEN
+            - name: QUILORE_ALLOW_INSECURE_DEFAULTS
+              value: "false"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=75.0"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 384Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi

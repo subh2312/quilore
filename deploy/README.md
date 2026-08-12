@@ -25,7 +25,11 @@ Registry: `ghcr.io/<owner>/quilore-backend` and `ghcr.io/<owner>/quilore-ai-serv
 
 ## Apply on a VPS / local host
 
-**Primary path (Cloudflare Tunnel + loopback):**
+Images are **`linux/arm64` only** (Pi / ARM hosts). There is no amd64 publish channel.
+
+**Preferred path (k3s + GHCR):** see `deploy/k8s/README.md`.
+
+**Compose fallback (Cloudflare Tunnel + loopback):**
 
 ```bash
 export BACKEND_IMAGE=ghcr.io/<owner>/quilore-backend:staging-<sha>
@@ -35,6 +39,7 @@ export DATA_ENCRYPTION_KEY='<base64 32 random bytes>'
 docker compose \
   -f docker-compose.yml \
   -f deploy/overlays/docker-compose.staging.yml \
+  -f deploy/overlays/docker-compose.uat.yml \
   -f deploy/overlays/docker-compose.tunnel.yml \
   up -d --no-build
 ```
