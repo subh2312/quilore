@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text } from "react-native";
 import { MacroProgressCard } from "@/components/quilore/MacroProgressCard";
 import { ManualMealComposer, MealLine } from "@/components/quilore/ManualMealComposer";
 import { PortionRangeSlider } from "@/components/quilore/PortionRangeSlider";
@@ -39,7 +39,12 @@ export default function NutritionScreen() {
     track("meal_logged", { mealId: id, itemCount: lines.length, source: "manual" });
     setSavedNote(`Saved ${lines.length} items offline — will sync via Spring Boot.`);
     try {
-      const totals = await calculateMeal(lines.map((l) => ({ name: l.name, grams: l.grams ?? 100 })));
+      const totals = await calculateMeal(
+        lines.map((line) => ({
+          name: line.foodName,
+          grams: line.unit === "g" ? Number(line.amount) || 100 : undefined,
+        })),
+      );
       setMacros([
         { label: "Calories", consumed: Math.round(totals.calories), target: 2200 },
         { label: "Protein", consumed: Math.round(totals.proteinG), target: 140, unit: "g" },
@@ -58,6 +63,9 @@ export default function NutritionScreen() {
     try {
       const quality = await fetchFoodQuality({ items: confirmed.map((i) => ({ name: i.label, grams })), mealType: "lunch" });
       setQualityNote(quality.feedback);
+      if (quality.degraded && quality.message) {
+        setSavedNote(quality.message);
+      }
     } catch {
       setQualityNote(null);
     }

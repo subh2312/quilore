@@ -2,12 +2,26 @@ export type UserRole = "USER" | "SUPPORT" | "ADMIN";
 export type AuthUser = { id: string; email: string; displayName: string; role: UserRole };
 export type AuthSession = { user: AuthUser; accessToken: string; refreshToken: string; expiresAt: string };
 export type CoachChatRequest = { message: string; conversationId?: string };
-export type CoachChatResponse = { reply: string; aiObservation: boolean; provider?: string; editableDraft?: Record<string, unknown> };
+export type CoachChatResponse = {
+  reply: string;
+  aiObservation: boolean;
+  provider?: string;
+  editableDraft?: Record<string, unknown>;
+  degraded?: boolean;
+  message?: string;
+};
 export type CoachProgramRequest = { prompt: string; goalType?: string };
-export type CoachProgramResponse = { jobId: string; status: string; message: string };
+export type CoachProgramResponse = { jobId: string; status: string; message: string; degraded?: boolean };
 export type WorkoutExercise = { name: string; sets: number; reps: number; weightKg?: number };
 export type OcrMapRequest = { text: string; source?: string };
-export type OcrMapResponse = { exercises: WorkoutExercise[]; rawText: string; aiObservation: boolean; provider?: string };
+export type OcrMapResponse = {
+  exercises: WorkoutExercise[];
+  rawText: string;
+  aiObservation: boolean;
+  provider?: string;
+  degraded?: boolean;
+  message?: string;
+};
 export type SessionSet = { reps: number; weightKg?: number };
 export type SessionExercise = { name: string; sets: SessionSet[] };
 export type SessionSummaryRequest = { sessionId: string; startedAt: string; completedAt: string; exercises: SessionExercise[] };
@@ -16,6 +30,6 @@ export type SessionSummaryResponse = { sessionId: string; durationMinutes: numbe
 export type MealLineInput = { name: string; grams?: number };
 export type MealCalculateResponse = { calories: number; proteinG: number; carbsG: number; fatG: number; disclaimer: string };
 export type FoodQualityRequest = { items: MealLineInput[]; mealType?: string };
-export type FoodQualityResponse = { feedback: string; aiObservation: boolean };
+export type FoodQualityResponse = { feedback: string; aiObservation: boolean; degraded?: boolean; message?: string };
 export type EntitlementState = { plan: string; features?: string[] };
 export type FoodAlias = { id: string; alias: string; foodCode?: string; status?: string };

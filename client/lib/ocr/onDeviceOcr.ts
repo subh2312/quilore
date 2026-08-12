@@ -7,6 +7,7 @@ export type OnDeviceOcrResult = {
   engine: "vision" | "mlkit" | "stub";
   lowConfidenceLines: string[];
   mappedExercises?: { name: string; sets: number; reps: number }[];
+  notice?: string;
 };
 
 const STUB_TEXT = "Squat 3x5 @ 100kg\nBench Press 3x8 @ 60kg";
@@ -30,9 +31,11 @@ export async function runOnDeviceOcr(imageUri: string): Promise<OnDeviceOcrResul
   }
 
   let mappedExercises: { name: string; sets: number; reps: number }[] | undefined;
+  let notice: string | undefined;
   if (pass.confidence < OCR_CONFIDENCE_THRESHOLD || pass.engine === "stub") {
     const mapped = await mapWorkoutOcr({ text: pass.text, source: "on_device_ocr" });
     mappedExercises = mapped.exercises;
+    notice = mapped.degraded ? mapped.message : undefined;
   }
 
   return {
@@ -41,5 +44,6 @@ export async function runOnDeviceOcr(imageUri: string): Promise<OnDeviceOcrResul
     engine: pass.engine,
     lowConfidenceLines,
     mappedExercises,
+    notice,
   };
 }

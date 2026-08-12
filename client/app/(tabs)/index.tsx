@@ -24,6 +24,7 @@ export default function WorkoutScreen() {
   const [sessionSummary, setSessionSummary] = useState<SessionSummaryResponse | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [ocrText, setOcrText] = useState("");
+  const [ocrNotice, setOcrNotice] = useState<string | null>(null);
 
   function toggleVoice() {
     if (listening) {
@@ -43,8 +44,13 @@ export default function WorkoutScreen() {
     }
   }
 
-  function handleImportMapped(text: string, exercises: { name: string; sets: number; reps: number }[]) {
+  function handleImportMapped(
+    text: string,
+    exercises: { name: string; sets: number; reps: number }[],
+    notice?: string,
+  ) {
     setOcrText(text);
+    setOcrNotice(notice ?? null);
     if (exercises.length > 0) {
       setDraftExercises(exercises.map((ex, i) => ({ id: `import_${Date.now()}_${i}`, name: ex.name, sets: String(ex.sets), reps: String(ex.reps) })));
     }
@@ -78,6 +84,7 @@ export default function WorkoutScreen() {
       <Text style={styles.subtitle}>Voice · PDF import · {getWhisperEngineName()} engine</Text>
       <PdfImportPanel onImported={handleImportMapped} />
       {ocrText ? <Text style={styles.note}>OCR draft: {ocrText.slice(0, 80)}…</Text> : null}
+      {ocrNotice ? <Text style={styles.note}>{ocrNotice}</Text> : null}
       <VoiceCaptureIndicator listening={listening} partial={partial} onToggle={toggleVoice} />
       <Pressable style={styles.primary} onPress={toggleVoice}>
         <Text style={styles.primaryText}>{listening ? "Stop voice" : "Start voice set"}</Text>

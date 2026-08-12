@@ -63,12 +63,8 @@ function localSessionSummary(body: SessionSummaryRequest): SessionSummaryRespons
 }
 
 export async function mapWorkoutOcr(body: OcrMapRequest): Promise<OcrMapResponse> {
-  const userId = await getStoredUserId();
   try {
-    if (!userId) {
-      throw new ApiClientError({ status: 401, message: 'offline', endpointUnavailable: true });
-    }
-    const res = await apiRequest<Record<string, unknown>>(`/api/workout/${userId}/ocr-map`, {
+    const res = await apiRequest<Record<string, unknown>>(`/api/workout/ocr-map`, {
       method: 'POST',
       body: { text: body.text, source: body.source ?? 'on_device_ocr' },
     });
@@ -80,6 +76,20 @@ export async function mapWorkoutOcr(body: OcrMapRequest): Promise<OcrMapResponse
       provider: (res.provider as string) ?? undefined,
     };
   } catch (err) {
+    if (err instanceof ApiClientError && err.status === 429) {
+      const exercises = parseExercisesFromText(body.text);
+      return {
+        exercises,
+        rawText: body.text,
+        aiObservation: exercises.length > 0,
+        provider: 'quota-degraded',
+        degraded: true,
+        message:
+          err.body && typeof err.body === 'object' && typeof err.body.message === 'string'
+            ? err.body.message
+            : err.message,
+      };
+    }
     if (err instanceof ApiClientError && err.endpointUnavailable) {
       const exercises = parseExercisesFromText(body.text);
       return { exercises, rawText: body.text, aiObservation: exercises.length > 0, provider: 'local-regex' };

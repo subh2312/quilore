@@ -5,7 +5,9 @@ export const UAT_MOCK_RECEIPT = "UAT_MOCK_RECEIPT";
 export const OCR_CONFIDENCE_THRESHOLD = 0.55;
 
 export function getApiBaseUrl(): string {
-  const raw = process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_API_BASE;
+  const envValue = process.env.EXPO_PUBLIC_API_URL;
+  const raw =
+    envValue && envValue !== "undefined" && envValue !== "null" ? envValue : DEFAULT_API_BASE;
   return raw.replace(/\/$/, "");
 }
 

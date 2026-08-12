@@ -1,20 +1,50 @@
 import { getApiBaseUrl } from "./config";
 import { getStoredAccessToken } from "./authStorage";
 
-export type ApiClientErrorShape = { status: number; message: string; endpointUnavailable?: boolean };
+export type ApiErrorBody = Record<string, unknown> | string | null;
+export type ApiClientErrorShape = {
+  status: number;
+  message: string;
+  endpointUnavailable?: boolean;
+  body?: ApiErrorBody;
+};
 
 export class ApiClientError extends Error {
   status: number;
   endpointUnavailable: boolean;
+  body?: ApiErrorBody;
   constructor(shape: ApiClientErrorShape) {
     super(shape.message);
     this.name = "ApiClientError";
     this.status = shape.status;
     this.endpointUnavailable = Boolean(shape.endpointUnavailable);
+    this.body = shape.body;
   }
 }
 
 export type ApiRequestInit = { method?: string; body?: unknown; auth?: boolean };
+
+async function readErrorBody(res: Response): Promise<ApiErrorBody> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    try {
+      return (await res.json()) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  const text = await res.text().catch(() => "");
+  return text || null;
+}
+
+function getErrorMessage(body: ApiErrorBody, fallback: string): string {
+  if (typeof body === "string") return body || fallback;
+  if (body && typeof body === "object") {
+    const message = body.message;
+    if (typeof message === "string" && message.length > 0) return message;
+  }
+  return fallback;
+}
 
 export async function apiRequest<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
   const base = getApiBaseUrl();
@@ -38,8 +68,13 @@ export async function apiRequest<T>(path: string, init: ApiRequestInit = {}): Pr
     throw new ApiClientError({ status: res.status, message: `Endpoint unavailable: ${path}`, endpointUnavailable: true });
   }
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new ApiClientError({ status: res.status, message: text || res.statusText, endpointUnavailable: false });
+    const body = await readErrorBody(res);
+    throw new ApiClientError({
+      status: res.status,
+      message: getErrorMessage(body, res.statusText),
+      endpointUnavailable: false,
+      body,
+    });
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

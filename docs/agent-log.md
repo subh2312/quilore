@@ -1,6 +1,14 @@
 # Agent Log
 
 - **Date:** 2026-08-12
+- **Tool:** copilot
+- **Branch:** copilot
+- **PR:** pending
+- **What:** Repointed client AI/network flows to Spring Boot gateway routes, added WatermelonDB Babel decorators config for native APK builds, and surfaced editable/degraded quota fallbacks in chat, nutrition, and workout import flows.
+- **Why:** PR #7 moved live AI invoke behind the Spring AI gateway, so the mobile client must target Spring Boot only, keep JWT auth on every call, and stay APK-ready for gym UAT without marking the remaining 12 Plane stories done before smoke validation.
+- **How:** Added `client/babel.config.js` plus explicit decorators plugin dependency, switched client requests to `/api/coach/chat`, `/api/coach/program`, `/api/nutrition/food-quality`, `/api/workout/ocr-map`, kept session summaries on the Spring Boot session-summary API, parsed 429 quota envelopes into editable degraded UI notices/local drafts, documented `client/docs/APK_BUILD.md` preview APK steps, and noted that Pi UAT is still blocked until SSH host `pi` is configured.
+
+- **Date:** 2026-08-12
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/7
@@ -35,15 +43,10 @@
 - **Date:** 2026-08-12
 - **Tool:** copilot
 - **Branch:** copilot
-<<<<<<< HEAD
 - **PR:** https://github.com/subh2312/quilore/pull/6 — secure all queue routes
 - **What:** Applied `require_internal_token` at the queue router level so `POST /ai/queue/jobs` and `GET /ai/queue/jobs/{id}` match `process-next`; expanded queue security tests.
 - **Why:** Agentic security review (MEDIUM): enqueue/status routes were still unauthenticated and allowed arbitrary job injection.
 - **How:** `APIRouter(dependencies=[Depends(require_internal_token)])`; updated backlog/security pytest to send internal token headers.
-
-=======
-- **PR:** https://github.com/subh2312/quilore/pull/6 — billing receipt validation security fix
->>>>>>> origin/dev
 - **What:** Server-side receipt validation for `/api/billing/{userId}/purchase` and `/restore`; `subscription_receipts` persistence; billing properties; security regression tests.
 - **Why:** HIGH severity paywall bypass — client-supplied `transactionId` alone activated PREMIUM without store verification.
 - **How:** `ReceiptValidationService` derives transaction IDs from verified store/mock receipts, records validated receipts with unique `(store, transaction_id)`, rejects cross-user reuse; mock receipts gated behind `quilore.billing.allow-mock-receipts` (default false).

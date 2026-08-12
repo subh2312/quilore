@@ -32,13 +32,30 @@ function localFoodQuality(req: FoodQualityRequest): FoodQualityResponse {
 /** Uses training/nutrition insight endpoint when available; local draft otherwise. */
 export async function fetchFoodQuality(req: FoodQualityRequest): Promise<FoodQualityResponse> {
   try {
-    const insights = await apiRequest<Array<{ message?: string }>>("/api/nutrition/insights/training", {
+    const response = await apiRequest<Record<string, unknown>>("/api/nutrition/food-quality", {
       method: "POST",
-      body: { avgCalorieAdherence: 0.9, avgProteinAdherence: 0.85, avgTrainingVolumeDelta: 0, days: 7 },
+      body: {
+        dishes: req.items.map((item) => item.name),
+        notes: req.mealType ? `Meal type: ${req.mealType}` : undefined,
+      },
     });
-    const msg = insights[0]?.message ?? localFoodQuality(req).feedback;
-    return { feedback: msg, aiObservation: true };
+    const message =
+      (typeof response.feedback === "string" && response.feedback) ||
+      (typeof response.message === "string" && response.message) ||
+      localFoodQuality(req).feedback;
+    return { feedback: message, aiObservation: true };
   } catch (err) {
+    if (err instanceof ApiClientError && err.status === 429) {
+      const degraded = localFoodQuality(req);
+      return {
+        ...degraded,
+        degraded: true,
+        message:
+          err.body && typeof err.body === "object" && typeof err.body.message === "string"
+            ? err.body.message
+            : err.message,
+      };
+    }
     if (err instanceof ApiClientError && err.endpointUnavailable) return localFoodQuality(req);
     throw err;
   }

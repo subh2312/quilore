@@ -5,7 +5,11 @@ import { palette, radii, spacing, typography, touchTarget } from "@/constants/De
 import { runOnDeviceOcr } from "@/lib/ocr/onDeviceOcr";
 
 type Props = {
-  onImported: (text: string, exercises: { name: string; sets: number; reps: number }[]) => void;
+  onImported: (
+    text: string,
+    exercises: { name: string; sets: number; reps: number }[],
+    notice?: string,
+  ) => void;
 };
 
 export function PdfImportPanel({ onImported }: Props) {
@@ -28,7 +32,7 @@ export function PdfImportPanel({ onImported }: Props) {
           const m = line.match(/^(.+?)\s+(\d+)\s*[x×]\s*(\d+)/i);
           return m ? [{ name: m[1].trim(), sets: Number(m[2]), reps: Number(m[3]) }] : [];
         });
-      onImported(ocr.text, exercises);
+      onImported(ocr.text, exercises, ocr.notice);
     } catch (err) {
       setNote(err instanceof Error ? err.message : "Import failed");
     } finally {

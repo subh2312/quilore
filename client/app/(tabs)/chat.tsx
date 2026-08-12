@@ -12,6 +12,7 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([
     { id: "1", role: "coach", ai: true, text: "Ask for supersets, plan tweaks, or program ideas. AI suggestions stay editable." },
   ]);
@@ -29,9 +30,13 @@ export default function ChatScreen() {
     setInput("");
     setLoading(true);
     setError(null);
+    setNotice(null);
     track("chat_message_sent", { length: userMsg.text.length });
     try {
       const res = await sendCoachChat({ message: userMsg.text });
+      if (res.degraded && res.message) {
+        setNotice(res.message);
+      }
       setMessages((prev) => [...prev, { id: String(Date.now() + 1), role: "coach", ai: res.aiObservation, text: res.reply }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Coach chat failed");
@@ -46,6 +51,7 @@ export default function ChatScreen() {
         <Text style={styles.title}>Coach Chat</Text>
         <Text style={styles.subtitle}>{coachingOn ? "Advanced coaching enabled" : "Coaching limited by flag"}</Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
         {messages.map((m) => (
           <View key={m.id} style={[styles.bubble, m.role === "user" ? styles.user : styles.coach]}>
             {m.ai ? <Text style={styles.ai}>AI observation</Text> : null}
@@ -77,6 +83,7 @@ const styles = StyleSheet.create({
   title: { fontSize: typography.fontSize.xl, fontWeight: "700", color: palette.gray900 },
   subtitle: { fontSize: typography.fontSize.sm, color: palette.gray500, marginBottom: spacing.sm },
   error: { color: palette.red, fontSize: typography.fontSize.sm },
+  notice: { color: palette.gray600, fontSize: typography.fontSize.sm },
   bubble: { padding: spacing.md, borderRadius: radii.lg, maxWidth: "92%" },
   user: { alignSelf: "flex-end", backgroundColor: palette.emerald },
   coach: { alignSelf: "flex-start", backgroundColor: palette.gray100 },

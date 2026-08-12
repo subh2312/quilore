@@ -3,7 +3,7 @@ import type { FoodAlias } from "./types";
 
 export async function listFoodAliases(): Promise<FoodAlias[]> {
   try {
-    const rows = await apiRequest<Array<Record<string, unknown>>>("/api/admin/food-aliases");
+    const rows = await apiRequest<Record<string, unknown>[]>("/api/admin/food-aliases");
     return rows.map((r) => ({
       id: String(r.id),
       alias: String(r.alias ?? r.rawAlias ?? ""),

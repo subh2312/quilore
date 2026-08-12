@@ -16,13 +16,13 @@ const COLLECTION_TABLE: Record<string, string> = {
   plans: "plans",
 };
 
-function useMemoryOnly() {
+function isMemoryOnly() {
   return process.env.JEST_WORKER_ID !== undefined;
 }
 
 async function persistRow(collection: string, id: string, row: Record<string, unknown>, enqueue: boolean) {
   const db = getWatermelonDatabase();
-  if (!db || useMemoryOnly()) return;
+  if (!db || isMemoryOnly()) return;
   const table = COLLECTION_TABLE[collection];
   if (!table) return;
   const payloadJson = JSON.stringify({ id, ...row });
@@ -59,7 +59,7 @@ export function resetOfflineStore() {
 
 export function upsertLocal(collection: string, id: string, row: Record<string, unknown>, enqueue = true) {
   memory.upsertLocal(collection, id, row, enqueue);
-  if (!useMemoryOnly()) {
+  if (!isMemoryOnly()) {
     void persistRow(collection, id, row, enqueue).catch(() => undefined);
   }
 }
@@ -85,12 +85,12 @@ export function getOfflineSnapshot() {
 }
 
 export function isMemoryBackend() {
-  return useMemoryOnly() || getWatermelonDatabase() === null;
+  return isMemoryOnly() || getWatermelonDatabase() === null;
 }
 
 export async function hydrateFromDatabase() {
   const db = getWatermelonDatabase();
-  if (!db || useMemoryOnly()) return;
+  if (!db || isMemoryOnly()) return;
   memory.resetOfflineStore();
   for (const [collection, table] of Object.entries(COLLECTION_TABLE)) {
     const rows = await db.get(table).query().fetch();
