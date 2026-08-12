@@ -3,7 +3,11 @@
 - **Date:** 2026-08-12
 - **Tool:** copilot
 - **Branch:** copilot
-- **PR:** https://github.com/subh2312/quilore/pull/6 — billing receipt validation security fix
+- **PR:** https://github.com/subh2312/quilore/pull/6 — secure all queue routes
+- **What:** Applied `require_internal_token` at the queue router level so `POST /ai/queue/jobs` and `GET /ai/queue/jobs/{id}` match `process-next`; expanded queue security tests.
+- **Why:** Agentic security review (MEDIUM): enqueue/status routes were still unauthenticated and allowed arbitrary job injection.
+- **How:** `APIRouter(dependencies=[Depends(require_internal_token)])`; updated backlog/security pytest to send internal token headers.
+
 - **What:** Server-side receipt validation for `/api/billing/{userId}/purchase` and `/restore`; `subscription_receipts` persistence; billing properties; security regression tests.
 - **Why:** HIGH severity paywall bypass — client-supplied `transactionId` alone activated PREMIUM without store verification.
 - **How:** `ReceiptValidationService` derives transaction IDs from verified store/mock receipts, records validated receipts with unique `(store, transaction_id)`, rejects cross-user reuse; mock receipts gated behind `quilore.billing.allow-mock-receipts` (default false).
