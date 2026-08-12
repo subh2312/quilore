@@ -7,7 +7,9 @@ let newSessionEstablishedDuringLogout = false;
 let inFlightLogoutCount = 0;
 
 function markNewSessionEstablished() {
-  newSessionEstablishedDuringLogout = true;
+  if (inFlightLogoutCount > 0) {
+    newSessionEstablishedDuringLogout = true;
+  }
 }
 
 export function isSupportOrAdmin(role: string): boolean {
