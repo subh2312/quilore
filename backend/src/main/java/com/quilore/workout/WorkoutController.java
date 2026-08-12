@@ -1,6 +1,7 @@
 package com.quilore.workout;
 
 import com.quilore.ai.AiGatewayClient;
+import com.quilore.billing.EntitlementService;
 import com.quilore.security.CurrentUser;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,19 +20,23 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/workout")
 public class WorkoutController {
+    private static final String AI_MEAL_SCAN_QUOTA = "ai_meal_scan";
 
     private final AiGatewayClient aiGatewayClient;
     private final WorkoutSessionService sessionService;
     private final SessionSummaryService sessionSummaryService;
+    private final EntitlementService entitlementService;
 
     public WorkoutController(
             AiGatewayClient aiGatewayClient,
             WorkoutSessionService sessionService,
-            SessionSummaryService sessionSummaryService
+            SessionSummaryService sessionSummaryService,
+            EntitlementService entitlementService
     ) {
         this.aiGatewayClient = aiGatewayClient;
         this.sessionService = sessionService;
         this.sessionSummaryService = sessionSummaryService;
+        this.entitlementService = entitlementService;
     }
 
     @PostMapping("/ocr-map")
@@ -47,6 +52,10 @@ public class WorkoutController {
     }
 
     private ResponseEntity<?> ocrMapForUser(UUID userId, Map<String, String> body) {
+        ResponseEntity<Map<String, Object>> limited = consumeQuotaOr429(userId, "ocr-map");
+        if (limited != null) {
+            return limited;
+        }
         String text = body.getOrDefault("text", "");
         String source = body.getOrDefault("source", "on_device_ocr");
         Map<String, Object> mapped = aiGatewayClient.ocrMapToSchema(text, source);
@@ -140,5 +149,23 @@ public class WorkoutController {
             return stringValue;
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be a string");
+    }
+
+    private ResponseEntity<Map<String, Object>> consumeQuotaOr429(UUID userId, String task) {
+        try {
+            entitlementService.consumeQuota(userId, AI_MEAL_SCAN_QUOTA);
+            return null;
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode() != HttpStatus.TOO_MANY_REQUESTS) {
+                throw ex;
+            }
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                    "userId", userId.toString(),
+                    "task", task,
+                    "editable", true,
+                    "degraded", true,
+                    "userConfirmationRequired", true,
+                    "message", "AI scan quota exceeded for this billing period. Please wait for reset or upgrade your plan."));
+        }
     }
 }

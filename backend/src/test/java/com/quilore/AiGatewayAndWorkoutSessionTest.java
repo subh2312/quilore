@@ -11,6 +11,7 @@ import com.quilore.workout.WorkoutSessionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,6 +23,11 @@ import java.util.UUID;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,7 +39,7 @@ class AiGatewayAndWorkoutSessionTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired AuthService authService;
-    @Autowired AiGatewayClient aiGatewayClient;
+    @SpyBean AiGatewayClient aiGatewayClient;
     @Autowired AiEnvelopeValidator envelopeValidator;
     @Autowired SessionSummaryService sessionSummaryService;
     @Autowired WorkoutSessionService workoutSessionService;
@@ -121,6 +127,64 @@ class AiGatewayAndWorkoutSessionTest {
                 .andExpect(jsonPath("$.degraded").value(true))
                 .andExpect(jsonPath("$.task").value("program"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("quota exceeded")));
+    }
+
+    @Test
+    void nutritionFoodQualityReturns429WhenScanQuotaIsExhausted() throws Exception {
+        String email = "nutrition-quota-" + UUID.randomUUID() + "@quilore.test";
+        authService.register(email, "password123", "Nutrition Quota User");
+        var login = authService.login(email, "password123");
+        entitlementService.assignPlan(login.userId(), "PREMIUM");
+        UsageCounterEntity counter = new UsageCounterEntity();
+        counter.setUserId(login.userId());
+        counter.setFeatureKey("ai_meal_scan");
+        counter.setPeriodStart(LocalDate.now().withDayOfMonth(1));
+        counter.setUsedCount(60);
+        usageCounterRepository.save(counter);
+        clearInvocations(aiGatewayClient);
+
+        mockMvc.perform(post("/api/nutrition/food-quality")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + login.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"dishes":["rajma chawal"],"notes":"post-workout lunch"}
+                                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.editable").value(true))
+                .andExpect(jsonPath("$.degraded").value(true))
+                .andExpect(jsonPath("$.task").value("food-quality"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("quota exceeded")));
+
+        verify(aiGatewayClient, never()).foodQuality(anyList(), any());
+    }
+
+    @Test
+    void workoutOcrMapReturns429WhenScanQuotaIsExhausted() throws Exception {
+        String email = "ocr-quota-" + UUID.randomUUID() + "@quilore.test";
+        authService.register(email, "password123", "OCR Quota User");
+        var login = authService.login(email, "password123");
+        entitlementService.assignPlan(login.userId(), "PREMIUM");
+        UsageCounterEntity counter = new UsageCounterEntity();
+        counter.setUserId(login.userId());
+        counter.setFeatureKey("ai_meal_scan");
+        counter.setPeriodStart(LocalDate.now().withDayOfMonth(1));
+        counter.setUsedCount(60);
+        usageCounterRepository.save(counter);
+        clearInvocations(aiGatewayClient);
+
+        mockMvc.perform(post("/api/workout/ocr-map")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + login.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"text":"Bench Press 3x5 @ 100","source":"on_device_ocr"}
+                                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.editable").value(true))
+                .andExpect(jsonPath("$.degraded").value(true))
+                .andExpect(jsonPath("$.task").value("ocr-map"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("quota exceeded")));
+
+        verify(aiGatewayClient, never()).ocrMapToSchema(any(), any());
     }
 
     @Test
