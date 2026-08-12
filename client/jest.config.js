@@ -5,6 +5,7 @@ module.exports = {
   testMatch: ["**/*.test.ts"],
   moduleNameMapper: {
     "^@sentry/react-native$": "<rootDir>/__tests__/mocks/sentry.ts",
+    "^@/(.*)$": "<rootDir>/$1",
   },
   transform: {
     "^.+\.tsx?$": [
@@ -15,6 +16,7 @@ module.exports = {
           types: ["jest", "node"],
           paths: {
             "@sentry/react-native": ["__tests__/mocks/sentry.ts"],
+            "@/*": ["./*"],
           },
           baseUrl: ".",
         },

@@ -1,0 +1,153 @@
+/**
+ * Local onboarding completion flag and draft fallback when backend is unavailable.
+ */
+
+const ONBOARDING_COMPLETE_KEY = 'quilore_onboarding_complete_v1';
+const ONBOARDING_DRAFT_KEY = 'quilore_onboarding_draft_v1';
+const PENDING_CONSENTS_KEY = 'quilore_pending_consents_v1';
+
+const memory: Record<string, string | undefined> = {};
+
+async function secureGet(key: string): Promise<string | null> {
+  if (process.env.JEST_WORKER_ID !== undefined) return memory[key] ?? null;
+  try {
+    const SecureStore = await import('expo-secure-store');
+    return (await SecureStore.getItemAsync(key)) ?? null;
+  } catch {
+    return memory[key] ?? null;
+  }
+}
+
+async function secureSet(key: string, value: string | null) {
+  if (process.env.JEST_WORKER_ID !== undefined) {
+    memory[key] = value ?? undefined;
+    return;
+  }
+  try {
+    const SecureStore = await import('expo-secure-store');
+    if (value == null) await SecureStore.deleteItemAsync(key);
+    else await SecureStore.setItemAsync(key, value);
+  } catch {
+    memory[key] = value ?? undefined;
+  }
+}
+
+export type OnboardingDraft = {
+  age?: number;
+  sex?: string;
+  heightCm?: number;
+  weightKg?: number;
+  trainingExperience?: string;
+  dietaryPreferences?: string;
+  injuriesInfo?: string;
+  equipmentAccess?: string;
+  primaryGoal?: string;
+  coachingTone?: string;
+  consentsAccepted?: boolean;
+};
+
+/** Required consent captured offline; must be flushed when Spring Boot is reachable. */
+export type PendingConsent = {
+  consentType: string;
+  accepted: boolean;
+  version: string;
+  appVersion: string;
+};
+
+function onboardingCompleteKey(userId: string) {
+  return `${ONBOARDING_COMPLETE_KEY}_${userId}`;
+}
+
+function onboardingDraftKey(userId: string) {
+  return `${ONBOARDING_DRAFT_KEY}_${userId}`;
+}
+
+function pendingConsentsKey(userId: string) {
+  return `${PENDING_CONSENTS_KEY}_${userId}`;
+}
+
+/** Serialize pending-consent read-modify-write ops per user to avoid parallel enqueue races. */
+const pendingConsentOps = new Map<string, Promise<unknown>>();
+
+function runPendingConsentOp<T>(userId: string, op: () => Promise<T>): Promise<T> {
+  const tail = pendingConsentOps.get(userId) ?? Promise.resolve();
+  const run = tail.catch(() => undefined).then(op);
+  pendingConsentOps.set(userId, run);
+  return run.finally(() => {
+    if (pendingConsentOps.get(userId) === run) {
+      pendingConsentOps.delete(userId);
+    }
+  });
+}
+
+export async function getOnboardingCompleteLocal(userId: string): Promise<boolean> {
+  const raw = await secureGet(onboardingCompleteKey(userId));
+  return raw === 'true';
+}
+
+export async function setOnboardingCompleteLocal(complete: boolean, userId: string) {
+  await secureSet(onboardingCompleteKey(userId), complete ? 'true' : null);
+}
+
+export async function clearOnboardingCompleteLocal(userId: string) {
+  await secureSet(onboardingCompleteKey(userId), null);
+}
+
+export async function getOnboardingDraft(userId: string): Promise<OnboardingDraft> {
+  const raw = await secureGet(onboardingDraftKey(userId));
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as OnboardingDraft;
+  } catch {
+    return {};
+  }
+}
+
+export async function saveOnboardingDraft(userId: string, patch: OnboardingDraft) {
+  const existing = await getOnboardingDraft(userId);
+  await secureSet(onboardingDraftKey(userId), JSON.stringify({ ...existing, ...patch }));
+}
+
+export async function clearOnboardingDraft(userId: string) {
+  await secureSet(onboardingDraftKey(userId), null);
+}
+
+export async function getPendingConsents(userId: string): Promise<PendingConsent[]> {
+  const raw = await secureGet(pendingConsentsKey(userId));
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as PendingConsent[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function enqueuePendingConsent(userId: string, item: PendingConsent) {
+  return runPendingConsentOp(userId, async () => {
+    const existing = await getPendingConsents(userId);
+    const next = [...existing.filter((c) => c.consentType !== item.consentType), item];
+    await secureSet(pendingConsentsKey(userId), JSON.stringify(next));
+  });
+}
+
+export async function removePendingConsent(userId: string, consentType: string) {
+  return runPendingConsentOp(userId, async () => {
+    const existing = await getPendingConsents(userId);
+    const next = existing.filter((c) => c.consentType !== consentType);
+    await secureSet(pendingConsentsKey(userId), next.length ? JSON.stringify(next) : null);
+  });
+}
+
+export async function clearPendingConsents(userId: string) {
+  await secureSet(pendingConsentsKey(userId), null);
+}
+
+/** Test helper */
+export function resetOnboardingStorageForTests() {
+  for (const key of Object.keys(memory)) {
+    if (key.startsWith('quilore_onboarding_') || key.startsWith('quilore_pending_consents_')) {
+      delete memory[key];
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { getApiBaseUrl } from "./config";
-import { getStoredAccessToken } from "./authStorage";
+import { getStoredAccessToken, touchLastAuthActivity } from "./authStorage";
 
 export type ApiErrorBody = Record<string, unknown> | string | null;
 export type ApiClientErrorShape = {
@@ -75,6 +75,9 @@ export async function apiRequest<T>(path: string, init: ApiRequestInit = {}): Pr
       endpointUnavailable: false,
       body,
     });
+  }
+  if (init.auth !== false) {
+    await touchLastAuthActivity();
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

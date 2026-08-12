@@ -3,7 +3,12 @@
  */
 
 import { getApiBaseUrl, UAT_MOCK_RECEIPT, OCR_CONFIDENCE_THRESHOLD } from "../../lib/api/config";
-import { clearStoredSession, persistSession } from "../../lib/api/authStorage";
+import {
+  clearStoredSession,
+  getLastAuthActivityMs,
+  getStoredAccessToken,
+  persistSession,
+} from "../../lib/api/authStorage";
 import { isSupportOrAdmin } from "../../lib/api/auth";
 import { sendCoachChat } from "../../lib/api/coach";
 import { fetchFoodQuality } from "../../lib/api/nutrition";
@@ -41,6 +46,125 @@ describe("Auth role gates", () => {
     expect(isSupportOrAdmin("SUPPORT")).toBe(true);
     expect(isSupportOrAdmin("ADMIN")).toBe(true);
     expect(isSupportOrAdmin("USER")).toBe(false);
+  });
+});
+
+describe("Auth register and refresh", () => {
+  const globalFetch = global.fetch;
+
+  afterEach(async () => {
+    global.fetch = globalFetch;
+    await clearStoredSession();
+  });
+
+  it("registers via Spring Boot and persists session", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        user: { id: "22222222-2222-2222-2222-222222222222", email: "a@b.com", displayName: "Alex", role: "USER" },
+        accessToken: "access-new",
+        refreshToken: "refresh-new",
+        expiresAt: "2026-08-13T00:00:00Z",
+      }),
+    });
+
+    const { register } = await import("../../lib/api/auth");
+    const session = await register("a@b.com", "password123", "Alex");
+
+    expect(session.user.displayName).toBe("Alex");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://localhost:8080/api/auth/register",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(await getStoredAccessToken()).toBe("access-new");
+    expect(await getLastAuthActivityMs()).not.toBeNull();
+  });
+
+  it("refreshes session and clears tokens on failure", async () => {
+    await persistSession({
+      accessToken: "old-access",
+      refreshToken: "old-refresh",
+      userId: "11111111-1111-1111-1111-111111111111",
+    });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      headers: { get: () => "application/json" },
+      json: async () => ({ message: "Invalid refresh token" }),
+    });
+
+    const { refreshSession } = await import("../../lib/api/auth");
+    const session = await refreshSession();
+
+    expect(session).toBeNull();
+    expect(await getStoredAccessToken()).toBeNull();
+  });
+
+  it("clears stored session on logout even when refresh rotated tokens during logout", async () => {
+    await persistSession({
+      accessToken: "old-access",
+      refreshToken: "old-refresh",
+      userId: "11111111-1111-1111-1111-111111111111",
+    });
+    global.fetch = jest.fn().mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/auth/logout")) {
+        await persistSession({
+          accessToken: "rotated-access",
+          refreshToken: "rotated-refresh",
+          userId: "11111111-1111-1111-1111-111111111111",
+        });
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          user: { id: "11111111-1111-1111-1111-111111111111", email: "a@b.com", displayName: "Alex", role: "USER" },
+          accessToken: "rotated-access",
+          refreshToken: "rotated-refresh",
+          expiresAt: "2026-08-13T00:00:00Z",
+        }),
+      };
+    });
+
+    const { logout } = await import("../../lib/api/auth");
+    await logout("old-refresh");
+
+    expect(await getStoredAccessToken()).toBeNull();
+  });
+
+  it("preserves a new login session when logout finishes after re-authentication", async () => {
+    await persistSession({
+      accessToken: "old-access",
+      refreshToken: "old-refresh",
+      userId: "11111111-1111-1111-1111-111111111111",
+    });
+    global.fetch = jest.fn().mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/auth/logout")) {
+        return new Promise((resolve) => {
+          setTimeout(() => resolve({ ok: true, status: 200, json: async () => ({}) }), 20);
+        });
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          user: { id: "22222222-2222-2222-2222-222222222222", email: "b@c.com", displayName: "Sam", role: "USER" },
+          accessToken: "new-access",
+          refreshToken: "new-refresh",
+          expiresAt: "2026-08-13T00:00:00Z",
+        }),
+      };
+    });
+
+    const { logout, login } = await import("../../lib/api/auth");
+    const logoutPromise = logout("old-refresh");
+    await login("b@c.com", "password123");
+    await logoutPromise;
+
+    expect(await getStoredAccessToken()).toBe("new-access");
   });
 });
 

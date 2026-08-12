@@ -24,6 +24,43 @@
 - **Why:** Gym UAT needs loopback+tunnel deploy on arm64 Pi; base/staging overlays never passed billing/JWT secrets into containers, and docs incorrectly treated `UAT_MOCK_RECEIPT` as a boolean env flag.
 - **How:** UAT overlay + tunnel overlay; document `QUILORE_ALLOW_MOCK_RECEIPTS=true` vs receipt token `UAT_MOCK_RECEIPT`; prefer `/mnt/ssd/apps/quilore` and local `--build` when GHCR is amd64-only.
 
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/9
+- **What:** Fail-closed required consent writes — no more `offline: true` success; re-validate required consents from Spring Boot before tab access / `markOnboardingComplete`.
+- **Why:** Agentic Security Review (MEDIUM) on PR #9: mandatory consent enforcement could be bypassed when backend was unavailable because `recordConsent` treated outages as success and onboarding proceeded.
+- **How:** `recordConsent` now throws on `endpointUnavailable`; `verifyRequiredConsents` + `resolveOnboardingComplete` gate tabs on GET `/api/privacy/consents`; legacy pending-queue flush retained only as migration; Jest contracts for fail-closed + re-validation.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/9
+- **What:** Resolved remaining PR #9 review threads — inactivity/onboarding consistency (prior commits), consent `appVersion` via `getAppVersion()`, logout clears tokens after concurrent refresh while preserving quick re-login.
+- **Why:** Bugbot/Security flagged inconsistent 30-day inactivity onboarding fallback, reverted hard-coded consent audit version, and logout leaving rotated refresh tokens on device when refresh raced logout.
+- **How:** Pulled `79e0dc7`/`d500cb1` (inactivity + appVersion); added `markNewSessionEstablished()` on login/register so `logout()` always clears stored credentials unless a new session was established during the in-flight request; Jest contracts for both paths.
+
+- **Date:** 2026-08-12
+- **Tool:** copilot
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/9
+- **What:** Full Profile tab (account details, editable baseline/goals/coaching prefs, logout) and 30-day inactivity auto-logout on the client; backend profile GET now returns dietary/equipment fields.
+- **Why:** Post-onboarding users need to review and edit baseline data, see account/plan context, and have dormant sessions cleared per security hygiene without inventing FastAPI auth.
+- **How:** Expanded `profile.tsx` with Spring Boot `/api/auth/me`, `/api/profiles/{userId}`, `/api/goals/{userId}`, and entitlements; added `sessionActivity.ts` persisting `quilore_last_auth_activity` on login/refresh and successful JWT API calls, enforced on AuthProvider bootstrap and AppState foreground; Jest coverage for the 30-day expiry path; extended `ProfileMetricsController.profileMap` for diet/equipment fields.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/9
+- **What:** Resolved all 8 open PR #9 review threads — user-scoped onboarding drafts, preserved per-user completion flag across logout, consent a11y/error UX, splash hide fallback, dynamic app version in consent audit.
+- **Why:** Bugbot/Copilot/Security review flagged cross-account draft leakage, logout wiping offline onboarding fallback, missing accessibilityState, silent consent failures, splash hang on hideAsync reject, and hard-coded appVersion.
+- **How:** Scoped draft storage to `userId` (mirroring completion flag), stopped clearing completion local on signOut, added `getAppVersion()` via expo-constants, catch + error UI on consent, `.catch` on splash hide, checkbox `accessibilityState`, extended onboarding storage tests.
+
+- **Date:** 2026-08-12
+- **Tool:** copilot
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/9
+- **What:** Added Quilore emerald logo assets, Reanimated branded splash, login/signup auth stack wired to Spring Boot JWT, AuthProvider route guards, and four-step onboarding (welcome → consent → profile baseline → goals) with backend profile/goal/consent persistence and local fallback.
+- **Why:** Epic 1 mobile entry — users need branded first launch, secure auth against Spring Boot (never FastAPI), and guided baseline/goal capture per `docs/Quilore.md` §4 Design System and product rules (editable AI output, injury risk flags).
+- **How:** Generated emerald Q-mark assets into `client/assets/images/`, kept `expo-splash-screen` for native boot plus `AnimatedSplash` overlay, extended `lib/api/auth.ts` with `register()`/`refreshSession()`, added `lib/api/profile.ts` + `lib/onboarding/storage.ts`, built `(auth)` and `onboarding` stacks with Reanimated transitions, and gated `(tabs)` until onboarding completes; Profile gets logout and re-run onboarding link.
 - **Date:** 2026-08-12
 - **Tool:** copilot
 - **Branch:** copilot

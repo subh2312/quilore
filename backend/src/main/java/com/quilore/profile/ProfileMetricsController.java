@@ -107,13 +107,17 @@ public class ProfileMetricsController {
     private static Map<String, Object> profileMap(ProfileMetricsService.Profile p) {
         return Map.of(
                 "userId", p.userId().toString(),
-                "age", p.age(),
-                "sex", p.sex(),
-                "heightCm", p.heightCm(),
-                "weightKg", p.weightKg(),
-                "trainingExperience", p.trainingExperience(),
-                "injuriesInfo", p.injuriesInfo(),
-                "injuriesDisclaimer", p.injuriesDisclaimer()
+                "age", p.age() == null ? 0 : p.age(),
+                "sex", p.sex() == null ? "" : p.sex(),
+                "heightCm", p.heightCm() == null ? 0 : p.heightCm(),
+                "weightKg", p.weightKg() == null ? 0 : p.weightKg(),
+                "trainingExperience", p.trainingExperience() == null ? "" : p.trainingExperience(),
+                "dietaryPreferences", p.dietaryPreferences() == null ? "" : p.dietaryPreferences(),
+                "injuriesInfo", p.injuriesInfo() == null ? "" : p.injuriesInfo(),
+                "equipmentAccess", p.equipmentAccess() == null ? "" : p.equipmentAccess(),
+                "injuriesDisclaimer", p.injuriesDisclaimer() == null
+                        ? ProfileMetricsService.INJURY_DISCLAIMER
+                        : p.injuriesDisclaimer()
         );
     }
 }
