@@ -2,6 +2,28 @@
 
 - **Date:** 2026-08-12
 - **Tool:** cursor
+- **Branch:** cursor-uat-pi-cloudflare-b3f3
+- **PR:** https://github.com/subh2312/quilore/pull/10
+- **What:** Path-filtered CI/publish + automatic Pi deploy on merge to `dev` (only changed backend/ai-service); `deploy/scripts/deploy-pi.sh`; client changes skipped for server CD.
+- **Why:** Dev work is near-complete — merges should ship to Pi without cloning/building everything, and without redeploying unrelated services; mobile CD comes next.
+- **How:** `dorny/paths-filter` in `ci.yml`/`publish-images.yml`; arm64 publish jobs gated per service; deploy job SSHes via Cloudflare Tunnel, pulls GHCR, recreates only changed Compose services. Requires `DEPLOY_*` repo secrets.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** cursor-uat-pi-cloudflare-b3f3
+- **PR:** https://github.com/subh2312/quilore/pull/10
+- **What:** Switched GHCR publish to **linux/arm64 only** (no amd64); added `deploy/k8s/uat` manifests + README; rewrote UAT docs to prefer Actions→GHCR→k3s over cloning/building on the Pi.
+- **Why:** Deploy target is Raspberry Pi / ARM forever; amd64 images and on-Pi monorepo builds were the wrong path and competed with Hermes/HA.
+- **How:** `publish-images.yml` QEMU + `platforms: linux/arm64`; k8s Namespace/StatefulSet/Deployments modeled on saleboomseo; compose marked fallback only.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** cursor/uat-pi-cloudflare-b3f3
+- **PR:** https://github.com/subh2312/quilore/pull/10
+- **What:** Added `deploy/overlays/docker-compose.uat.yml` (injects JWT/encryption/internal-token/mock-IAP into containers) and rewrote `deploy/uat-pi.md` for Cloudflare Tunnel UAT on Pi, clarifying mock-receipt naming.
+- **Why:** Gym UAT needs loopback+tunnel deploy on arm64 Pi; base/staging overlays never passed billing/JWT secrets into containers, and docs incorrectly treated `UAT_MOCK_RECEIPT` as a boolean env flag.
+- **How:** UAT overlay + tunnel overlay; document `QUILORE_ALLOW_MOCK_RECEIPTS=true` vs receipt token `UAT_MOCK_RECEIPT`; prefer `/mnt/ssd/apps/quilore` and local `--build` when GHCR is amd64-only.
+
 - **Branch:** copilot
 - **PR:** https://github.com/subh2312/quilore/pull/9
 - **What:** Fail-closed required consent writes — no more `offline: true` success; re-validate required consents from Spring Boot before tab access / `markOnboardingComplete`.
@@ -39,7 +61,6 @@
 - **What:** Added Quilore emerald logo assets, Reanimated branded splash, login/signup auth stack wired to Spring Boot JWT, AuthProvider route guards, and four-step onboarding (welcome → consent → profile baseline → goals) with backend profile/goal/consent persistence and local fallback.
 - **Why:** Epic 1 mobile entry — users need branded first launch, secure auth against Spring Boot (never FastAPI), and guided baseline/goal capture per `docs/Quilore.md` §4 Design System and product rules (editable AI output, injury risk flags).
 - **How:** Generated emerald Q-mark assets into `client/assets/images/`, kept `expo-splash-screen` for native boot plus `AnimatedSplash` overlay, extended `lib/api/auth.ts` with `register()`/`refreshSession()`, added `lib/api/profile.ts` + `lib/onboarding/storage.ts`, built `(auth)` and `onboarding` stacks with Reanimated transitions, and gated `(tabs)` until onboarding completes; Profile gets logout and re-run onboarding link.
-
 - **Date:** 2026-08-12
 - **Tool:** copilot
 - **Branch:** copilot

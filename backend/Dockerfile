@@ -1,6 +1,8 @@
 # ── Build stage ───────────────────────────────────────────────
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
+# Pi/VPS builds often need a longer wrapper download window than the default 10s.
+ENV GRADLE_OPTS="-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
 COPY . .
 RUN ./gradlew bootJar --no-daemon
 

@@ -1,95 +1,42 @@
-# Raspberry Pi Gym UAT Deployment
+# Raspberry Pi Gym UAT — preferred path
 
-This guide covers hosting the Quilore stack on a Raspberry Pi for sideload APK UAT.
+**Canonical path:** merge to `dev` → GitHub Actions publishes **`linux/arm64` only for changed services** → auto-deploys those services to the Pi (`publish-images.yml` + `deploy/scripts/deploy-pi.sh`).  
+Client/RN changes do not redeploy server containers (mobile pipeline next).
 
-## Blocker (2026-08-12)
+Do **not** publish amd64. Do **not** relocate Docker root (Hermes / HA stay put).
 
-**SSH to Pi is not configured on this machine.**
+See `deploy/README.md` (Pi auto-deploy secrets) and `deploy/k8s/README.md` (optional k3s manifests).
 
-```bash
-ssh pi
-# ssh: Could not resolve hostname pi: nodename nor servname provided, or not known
+## Mock IAP — two different names
+
+| Name | What it is |
+|---|---|
+| `QUILORE_ALLOW_MOCK_RECEIPTS` | Boolean **env flag** (master switch) |
+| `UAT_MOCK_RECEIPT` | Receipt **token string** the client POSTs (`QUILORE_MOCK_RECEIPT_TOKEN` default) |
+
+`UAT_MOCK_RECEIPT=true` is wrong — that string is not a boolean env var.
+
+## Cloudflare
+
+DNS CNAME (once): `cloudflared tunnel route dns sm4devlabs-pi quilore.sm4devlabs.dpdns.org`
+
+Add ingress on the **running** tunnel config (`/etc/cloudflared/config.yml`, needs sudo):
+
+```yaml
+  - hostname: quilore.sm4devlabs.dpdns.org
+    service: http://127.0.0.1:8080
 ```
 
-No `Host pi` entry exists in `~/.ssh/config`.
+Then `sudo systemctl restart cloudflared`.
 
-## What you need to provide
+APK: `EXPO_PUBLIC_API_URL=https://quilore.sm4devlabs.dpdns.org` (see `client/docs/APK_BUILD.md`).
 
-1. Pi LAN IP or hostname (e.g. `192.168.1.50`)
-2. SSH user (typically `pi` or your username)
-3. SSH key or password access
-4. Pi with **4GB+ RAM**, Docker Engine, and Docker Compose v2
+## Fallback (not preferred)
 
-### Optional: add SSH config
+Compose overlays under `deploy/overlays/` remain for local/dev. Building on the Pi is an emergency fallback only when GHCR arm64 tags are missing.
 
-```bash
-# ~/.ssh/config
-Host pi
-  HostName 192.168.1.50
-  User pi
-  IdentityFile ~/.ssh/id_ed25519
-```
+## Coexistence
 
-Then verify:
-
-```bash
-ssh pi 'docker --version && docker compose version'
-```
-
-## Deploy stack on Pi
-
-On the Pi (after cloning/pulling `cursor` merged into `dev` or checking out the UAT branch):
-
-```bash
-git clone https://github.com/subh2312/quilore.git
-cd quilore
-cp .env.example .env
-# Edit .env — NEVER commit real keys:
-#   JWT_SECRET=<32+ random bytes>
-#   DATA_ENCRYPTION_KEY=<base64 32 bytes>
-#   NVIDIA_NIM_API_KEY=<server-side only>
-#   UAT_MOCK_RECEIPT=true   # enables mock IAP for gym UAT
-
-docker compose \
-  -f docker-compose.yml \
-  -f deploy/overlays/docker-compose.staging.yml \
-  up -d --build
-```
-
-Verify health:
-
-```bash
-curl -s http://127.0.0.1:8080/api/health
-curl -s http://127.0.0.1:8000/health
-```
-
-## Point the sideload APK at Pi
-
-Build the preview APK with EAS (see `client/docs/APK_BUILD.md`):
-
-```bash
-cd client
-EXPO_PUBLIC_API_URL=http://<PI_LAN_IP>:8080 npx eas build --profile preview --platform android
-```
-
-For gym Wi‑Fi UAT, devices must reach `http://<PI_LAN_IP>:8080` on the LAN. Android 9+ may require cleartext allowance — the preview build uses HTTP for local UAT only.
-
-Example:
-
-```bash
-EXPO_PUBLIC_API_URL=http://192.168.1.50:8080
-```
-
-## Off-LAN testers (later)
-
-Use Cloudflare Tunnel per `deploy/README.md` and `deploy/overlays/docker-compose.tunnel.yml` instead of exposing port 8080 publicly.
-
-## Mock IAP for UAT
-
-With `UAT_MOCK_RECEIPT=true` on the backend, the client sends receipt `UAT_MOCK_RECEIPT` on purchase/restore to unlock PREMIUM without Play Console. Real Play IAP validation remains deferred to post-license launch.
-
-## Deferred (honest)
-
-- Real Google Play IAP receipt validation
-- Sentry DSN (optional; local crash sink works for UAT)
-- Production TLS domain (Pi LAN HTTP is UAT-only)
+- Hermes on `127.0.0.1:9119` (jarvis tunnel) — leave running
+- Home Assistant — leave running
+- Docker data root `/mnt/ssd/docker` — do not move

@@ -11,9 +11,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      ai: ${{ steps.filter.outputs.ai }}
+      client: ${{ steps.filter.outputs.client }}
+      deploy: ${{ steps.filter.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            ai:
+              - 'ai-service/**'
+            client:
+              - 'client/**'
+            deploy:
+              - 'deploy/**'
+              - 'docker-compose.yml'
+              - '.github/workflows/**'
+
   # ─── Spring Boot Backend ─────────────────────────────────
   backend:
     name: Backend (Java 21 / Spring Boot)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,6 +64,8 @@ jobs:
   # ─── FastAPI AI Service ──────────────────────────────────
   ai-service:
     name: AI Service (Python 3.12 / FastAPI)
+    needs: changes
+    if: needs.changes.outputs.ai == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -64,6 +93,8 @@ jobs:
   # ─── React Native Client ────────────────────────────────
   client:
     name: Client (React Native / Expo)
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -93,6 +124,8 @@ jobs:
   # ─── Deploy tooling (promotion / rollback scripts) ───────
   deploy-tooling:
     name: Deploy Tooling Tests
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -106,40 +139,57 @@ jobs:
       - name: Validate Cloudflare Tunnel loopback overlay
         run: bash deploy/tests/test_tunnel_overlay.sh
 
+      - name: Validate deploy-pi.sh syntax
+        run: bash -n deploy/scripts/deploy-pi.sh
+
   # ─── Docker image build (no publish on PRs) ──────────────
-  docker-build:
-    name: Docker Image Build
+  docker-build-backend:
+    name: Docker Build — backend (arm64 check)
     runs-on: ubuntu-latest
-    needs: [backend, ai-service]
+    needs: [changes, backend]
+    if: needs.changes.outputs.backend == 'true' && needs.backend.result == 'success'
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build backend image
-        uses: docker/build-push-action@v6
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
+          platforms: linux/arm64
           push: false
           tags: quilore-backend:ci
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+          cache-from: type=gha,scope=backend-arm64
+          cache-to: type=gha,mode=max,scope=backend-arm64
 
-      - name: Build ai-service image
-        uses: docker/build-push-action@v6
+  docker-build-ai:
+    name: Docker Build — ai-service (arm64 check)
+    runs-on: ubuntu-latest
+    needs: [changes, ai-service]
+    if: needs.changes.outputs.ai == 'true' && needs.ai-service.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
         with:
           context: ./ai-service
           file: ./ai-service/Dockerfile
+          platforms: linux/arm64
           push: false
           tags: quilore-ai-service:ci
-          cache-from: type=gha,scope=ai-service
-          cache-to: type=gha,mode=max,scope=ai-service
+          cache-from: type=gha,scope=ai-service-arm64
+          cache-to: type=gha,mode=max,scope=ai-service-arm64
 
   # ─── Docker Compose validation ──────────────────────────
   docker-compose:
     name: Docker Compose Validation
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.ai == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -147,11 +197,17 @@ jobs:
       - name: Validate base compose
         run: docker compose -f docker-compose.yml config --quiet
 
-      - name: Validate staging overlay
+      - name: Validate staging + UAT + tunnel overlays
+        env:
+          JWT_SECRET: ci-jwt-secret-at-least-32-characters-long
+          DATA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          AI_SERVICE_INTERNAL_TOKEN: ci-internal-token
         run: >
           docker compose
           -f docker-compose.yml
           -f deploy/overlays/docker-compose.staging.yml
+          -f deploy/overlays/docker-compose.uat.yml
+          -f deploy/overlays/docker-compose.tunnel.yml
           config --quiet
 
       - name: Validate production overlay

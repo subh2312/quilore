@@ -15,17 +15,37 @@ Registry: `ghcr.io/<owner>/quilore-backend` and `ghcr.io/<owner>/quilore-ai-serv
 
 ## Happy path
 
-1. Open a PR into `dev` → CI lint/tests + Docker build validation run.
-2. Merge to `dev` → publish workflow pushes versioned staging images and a `versions.env` artifact.
-3. Smoke-test staging (compose overlay below).
+1. Open a PR into `dev` → CI runs **only for changed paths** (backend / ai-service / client / deploy).
+2. Merge to `dev` → `publish-images.yml`:
+   - Builds/publishes **linux/arm64** images **only for changed server services**
+   - Deploys those services to the Pi (`deploy/scripts/deploy-pi.sh`) when deploy secrets are set
+   - Client-only changes do **not** publish or redeploy server images (mobile CD comes next)
+3. Smoke-test staging / Pi (`https://quilore.sm4devlabs.dpdns.org/api/health` once Cloudflare ingress is applied).
 4. Run **Promote — Staging to Production** with:
    - `version`: the staging/release tag (e.g. `staging-a1b2c3d` or `v1.2.3`)
    - `confirm`: `promote-to-production`
 5. Production `:production` tags move to that immutable digest (no rebuild).
 
+### Pi auto-deploy secrets (required for step 2 deploy)
+
+Repo → Settings → Secrets and variables → Actions:
+
+| Secret | Example |
+|---|---|
+| `DEPLOY_HOST` | `ssh.sm4devlabs.dpdns.org` |
+| `DEPLOY_USER` | `subh` |
+| `DEPLOY_SSH_KEY` | private key authorized on the Pi (e.g. quilore-agent) |
+| `DEPLOY_PATH` | `/mnt/ssd/apps/quilore` |
+
+Also seed `${DEPLOY_PATH}/.env` on the Pi once (JWT/encryption/internal token/mock receipts). Hermes/HA are left alone; Docker root is not moved.
+
 ## Apply on a VPS / local host
 
-**Primary path (Cloudflare Tunnel + loopback):**
+Images are **`linux/arm64` only** (Pi / ARM hosts). There is no amd64 publish channel.
+
+**Preferred path (k3s + GHCR):** see `deploy/k8s/README.md`.
+
+**Compose fallback (Cloudflare Tunnel + loopback):**
 
 ```bash
 export BACKEND_IMAGE=ghcr.io/<owner>/quilore-backend:staging-<sha>
@@ -35,6 +55,7 @@ export DATA_ENCRYPTION_KEY='<base64 32 random bytes>'
 docker compose \
   -f docker-compose.yml \
   -f deploy/overlays/docker-compose.staging.yml \
+  -f deploy/overlays/docker-compose.uat.yml \
   -f deploy/overlays/docker-compose.tunnel.yml \
   up -d --no-build
 ```
