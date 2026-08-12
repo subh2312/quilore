@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const markOnboardingComplete = useCallback(async () => {
     if (!user) return;
     await flushPendingConsents(user.id);
-    const consentsOk = await verifyRequiredConsents(user.id);
+    const consentsOk = await verifyRequiredConsents(user.id, { allowOfflineWithoutPriorLocal: true });
     if (!consentsOk) {
       throw new Error('Required consents must be saved on the server before continuing.');
     }

@@ -123,7 +123,10 @@ export function hasAcceptedRequiredConsents(records: ConsentRecord[]): boolean {
  *   (implies a prior successful online consent write after fail-closed enforcement).
  * - Pending offline queue remaining: deny access until flushed.
  */
-export async function verifyRequiredConsents(userId: string): Promise<boolean> {
+export async function verifyRequiredConsents(
+  userId: string,
+  options?: { allowOfflineWithoutPriorLocal?: boolean },
+): Promise<boolean> {
   const { getOnboardingCompleteLocal, getPendingConsents } = await import('../onboarding/storage');
   if ((await getPendingConsents(userId)).length > 0) {
     return false;
@@ -133,6 +136,9 @@ export async function verifyRequiredConsents(userId: string): Promise<boolean> {
     return hasAcceptedRequiredConsents(records);
   } catch (err) {
     if (err instanceof ApiClientError && err.endpointUnavailable) {
+      if (options?.allowOfflineWithoutPriorLocal) {
+        return true;
+      }
       return (await getOnboardingCompleteLocal(userId)) === true;
     }
     return false;
@@ -197,7 +203,7 @@ export async function savePrivacyPreferences(
 }
 
 export async function resolveOnboardingComplete(userId: string): Promise<boolean> {
-  const { getOnboardingCompleteLocal } = await import('../onboarding/storage');
+  const { getOnboardingCompleteLocal, setOnboardingCompleteLocal } = await import('../onboarding/storage');
   let baselineComplete = await getOnboardingCompleteLocal(userId);
   if (!baselineComplete) {
     try {
@@ -210,5 +216,9 @@ export async function resolveOnboardingComplete(userId: string): Promise<boolean
     }
   }
   if (!baselineComplete) return false;
-  return verifyRequiredConsents(userId);
+  const consentsOk = await verifyRequiredConsents(userId);
+  if (consentsOk) {
+    await setOnboardingCompleteLocal(true, userId);
+  }
+  return consentsOk;
 }
