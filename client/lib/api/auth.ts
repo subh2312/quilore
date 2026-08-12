@@ -50,6 +50,9 @@ export async function logout(refreshToken: string) {
   try {
     await apiRequest("/api/auth/logout", { method: "POST", body: { refreshToken } });
   } finally {
-    await clearStoredSession();
+    const current = await getStoredRefreshToken();
+    if (current === refreshToken) {
+      await clearStoredSession();
+    }
   }
 }
