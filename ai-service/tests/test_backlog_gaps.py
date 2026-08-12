@@ -32,24 +32,27 @@ def test_ocr_http_endpoint():
 
 def test_queue_idempotent_enqueue_and_status(monkeypatch):
     monkeypatch.setattr(settings, "internal_api_token", "test-internal-token")
+    headers = {"X-Internal-Token": "test-internal-token"}
+    unauthorized = client.post(
+        "/ai/queue/jobs",
+        json={"task_type": "program_generation", "payload": {}, "idempotency_key": "k1"},
+    )
+    assert unauthorized.status_code == 401
     a = client.post(
         "/ai/queue/jobs",
         json={"task_type": "program_generation", "payload": {}, "idempotency_key": "k1"},
+        headers=headers,
     )
     b = client.post(
         "/ai/queue/jobs",
         json={"task_type": "program_generation", "payload": {}, "idempotency_key": "k1"},
+        headers=headers,
     )
     assert a.status_code == 200
     assert a.json()["job"]["id"] == b.json()["job"]["id"]
     job_id = a.json()["job"]["id"]
-    unauthorized = client.post("/ai/queue/jobs/process-next")
-    assert unauthorized.status_code == 401
-    client.post(
-        "/ai/queue/jobs/process-next",
-        headers={"X-Internal-Token": "test-internal-token"},
-    )
-    got = client.get(f"/ai/queue/jobs/{job_id}")
+    client.post("/ai/queue/jobs/process-next", headers=headers)
+    got = client.get(f"/ai/queue/jobs/{job_id}", headers=headers)
     assert got.json()["status"] == "completed"
 
 

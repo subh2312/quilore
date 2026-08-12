@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from app.queue.job_queue import queue
 from app.security.internal_auth import require_internal_token
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_internal_token)])
 
 
 class EnqueueRequest(BaseModel):
@@ -27,7 +27,7 @@ async def get_job(job_id: str):
     return queue.to_dict(job)
 
 
-@router.post("/jobs/process-next", dependencies=[Depends(require_internal_token)])
+@router.post("/jobs/process-next")
 async def process_next():
     job = queue.process_next()
     if job is None:
