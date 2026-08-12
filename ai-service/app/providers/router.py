@@ -62,14 +62,18 @@ def _model_for_task(task_type: TaskType, *, escalate: bool = False) -> str:
 def _build_messages(task_type: TaskType, request: InvokeRequest) -> list[dict[str, str]]:
     inp = request.input or {}
     if task_type == TaskType.CHAT:
-        system = str(inp.get("system") or "You are Quilore's fitness coach. Be concise and actionable.")
+        system = str(
+            inp.get("system") or "You are Quilore's fitness coach. Be concise and actionable."
+        )
         user = str(inp.get("prompt") or inp.get("message") or inp.get("q") or "")
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
     if task_type == TaskType.MEAL_PARSE:
         return [
             {
                 "role": "system",
-                "content": "Parse meal descriptions into JSON with dishes[], portions[], editable=true.",
+                "content": (
+                    "Parse meal descriptions into JSON with dishes[], portions[], editable=true."
+                ),
             },
             {"role": "user", "content": str(inp.get("text") or inp.get("prompt") or "")},
         ]
@@ -77,7 +81,10 @@ def _build_messages(task_type: TaskType, request: InvokeRequest) -> list[dict[st
         return [
             {
                 "role": "system",
-                "content": "Extract workout or nutrition label text from OCR input. Return plain text only.",
+                "content": (
+                    "Extract workout or nutrition label text from OCR input. "
+                    "Return plain text only."
+                ),
             },
             {"role": "user", "content": str(inp.get("text") or inp.get("ocr_text") or "")},
         ]
@@ -112,7 +119,9 @@ def _invoke_nim(task_type: TaskType, request: InvokeRequest) -> dict[str, Any]:
         return {"reply": filtered, "model": model, "safety": safety}
     if task_type == TaskType.MEAL_PARSE:
         try:
-            content = json.loads(filtered) if filtered.strip().startswith("{") else {"raw": filtered}
+            content = (
+                json.loads(filtered) if filtered.strip().startswith("{") else {"raw": filtered}
+            )
         except Exception:
             content = {"raw": filtered, "parseError": True}
         return {"result": content, "safety": safety, "editable": True}

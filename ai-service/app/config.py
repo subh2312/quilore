@@ -1,8 +1,16 @@
 """Application configuration via pydantic-settings."""
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
     port: int = 8000
+    # Shared secret for privileged service-to-service routes (e.g. queue workers).
+    internal_api_token: str = Field(default="", validation_alias="AI_SERVICE_INTERNAL_TOKEN")
+
+    # ─── Database (read-only access for RAG / embeddings) ────
     database_url: str = "postgresql://quilore:quilore_dev_pass@localhost:5432/quilore"
     groq_api_key: str = ""
     openrouter_api_key: str = ""
@@ -14,4 +22,6 @@ class Settings(BaseSettings):
     nim_ocr_model: str = "nvidia/nemotron-ocr-v2"
     nim_embed_model: str = "nvidia/nemotron-3-embed-1b"
     nim_safety_model: str = "nvidia/nemotron-3.5-content-safety"
+
+
 settings = Settings()

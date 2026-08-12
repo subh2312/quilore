@@ -223,7 +223,6 @@ public class NutritionController {
         return ResponseEntity.ok(flags.stream().map(mealTimingService::toMap).toList());
     }
 
-
     @PostMapping("/food-quality")
     public ResponseEntity<?> foodQuality(@RequestBody Map<String, Object> body) {
         CurrentUser.requireAuthentication();

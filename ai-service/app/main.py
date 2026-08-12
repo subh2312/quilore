@@ -35,6 +35,9 @@ async def lifespan(app: FastAPI):
             "service_starting",
             port=settings.port,
             nim_configured=nim_client.nim_configured(),
+            groq_configured=bool(settings.groq_api_key),
+            openrouter_configured=bool(settings.openrouter_api_key),
+            huggingface_configured=bool(settings.hf_api_token),
         )
         if nim_client.nim_configured():
             nim_client.verify_models_at_startup()
@@ -50,6 +53,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
 app.add_middleware(ObservabilityMiddleware)
 app.include_router(providers_router, prefix="/ai", tags=["AI Providers"])
 app.include_router(pose_router, prefix="/ai/pose", tags=["Pose"])
@@ -77,5 +81,6 @@ async def health():
 
 @app.get("/metrics")
 async def metrics():
+    """Prometheus metrics scrape endpoint."""
     refresh_provider_health_metrics()
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

@@ -26,6 +26,9 @@ quilore:
     # 32 zero bytes — allowed only because allow-insecure-defaults is true in tests
     data-encryption-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     allow-insecure-defaults: true
+  billing:
+    allow-mock-receipts: true
+    mock-receipt-token: UAT_MOCK_RECEIPT
 
 minio:
   enabled: false

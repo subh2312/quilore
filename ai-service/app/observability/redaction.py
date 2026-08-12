@@ -20,6 +20,7 @@ _SENSITIVE_KEYS = {
     "openrouter_api_key",
     "hf_api_token",
     "nvidia_nim_api_key",
+    "internal_api_token",
 }
 
 _BEARER = re.compile(r"(?i)(bearer\s+)[a-z0-9._\-]+")

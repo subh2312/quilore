@@ -1,4 +1,8 @@
-"""In-process background queue for non-urgent AI tasks (Story 13.2)."""
+"""In-process background queue for non-urgent AI tasks (Story 13.2).
+
+Jobs are queued instead of blocking; status is queryable. Idempotency keys
+prevent duplicate side effects. Durable Redis/RabbitMQ can replace this later.
+"""
 
 from __future__ import annotations
 

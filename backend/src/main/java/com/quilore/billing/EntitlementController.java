@@ -2,7 +2,6 @@ package com.quilore.billing;
 
 import com.quilore.security.CurrentUser;
 import com.quilore.security.PermissionAuditService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -21,17 +20,17 @@ import java.util.UUID;
 public class EntitlementController {
 
     private final EntitlementService service;
+    private final ReceiptValidationService receiptValidationService;
     private final PermissionAuditService permissionAuditService;
-    private final boolean uatMockReceipt;
 
     public EntitlementController(
             EntitlementService service,
-            PermissionAuditService permissionAuditService,
-            @Value("${quilore.billing.uat-mock-receipt:false}") boolean uatMockReceipt
+            ReceiptValidationService receiptValidationService,
+            PermissionAuditService permissionAuditService
     ) {
         this.service = service;
+        this.receiptValidationService = receiptValidationService;
         this.permissionAuditService = permissionAuditService;
-        this.uatMockReceipt = uatMockReceipt;
     }
 
     @GetMapping("/plans")
@@ -70,33 +69,26 @@ public class EntitlementController {
     @PostMapping("/billing/{userId}/purchase")
     public ResponseEntity<?> purchase(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
         UUID owner = CurrentUser.requireSelfOrAdmin(userId);
-        String productId = String.valueOf(body.getOrDefault("productId", "premium_monthly"));
-        String store = String.valueOf(body.getOrDefault("store", "app_store"));
-        String tx = String.valueOf(body.getOrDefault("transactionId", UUID.randomUUID().toString()));
-        String receipt = body.get("receipt") == null ? "" : String.valueOf(body.get("receipt"));
-        if (tx.isBlank() && receipt.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("activated", false, "reason", "missing_transaction"));
-        }
-        if (uatMockReceipt && "UAT_MOCK_RECEIPT".equals(receipt)) {
-            service.assignPlan(owner, "PREMIUM");
-            return ResponseEntity.ok(Map.of(
-                    "activated", true,
-                    "store", store,
-                    "productId", productId,
-                    "transactionId", tx.isBlank() ? "uat-mock-" + UUID.randomUUID() : tx,
-                    "mockUat", true,
+        String productId = stringValue(body.get("productId"), "premium_monthly");
+        String store = resolveStore(body);
+        String receipt = stringValue(body.get("receipt"), "");
+
+        ReceiptValidationService.ActivationResult result = receiptValidationService
+                .activatePurchase(owner, store, productId, receipt);
+        if (!result.activated()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "activated", false,
+                    "reason", result.reason(),
                     "entitlements", service.entitlementState(owner)
             ));
         }
-        if (tx.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("activated", false, "reason", "missing_transaction"));
-        }
+
         service.assignPlan(owner, "PREMIUM");
         return ResponseEntity.ok(Map.of(
                 "activated", true,
-                "store", store,
-                "productId", productId,
-                "transactionId", tx,
+                "store", result.store(),
+                "productId", result.productId(),
+                "transactionId", result.transactionId(),
                 "entitlements", service.entitlementState(owner)
         ));
     }
@@ -104,28 +96,23 @@ public class EntitlementController {
     @PostMapping("/billing/{userId}/restore")
     public ResponseEntity<?> restore(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
         UUID owner = CurrentUser.requireSelfOrAdmin(userId);
-        String tx = String.valueOf(body.getOrDefault("transactionId", ""));
-        String receipt = body.get("receipt") == null ? "" : String.valueOf(body.get("receipt"));
-        if (uatMockReceipt && "UAT_MOCK_RECEIPT".equals(receipt)) {
-            service.assignPlan(owner, "PREMIUM");
-            return ResponseEntity.ok(Map.of(
-                    "restored", true,
-                    "transactionId", tx.isBlank() ? "uat-mock-restore" : tx,
-                    "mockUat", true,
-                    "entitlements", service.entitlementState(owner)
-            ));
-        }
-        if (tx.isBlank()) {
+        String store = resolveStore(body);
+        String receipt = stringValue(body.get("receipt"), "");
+
+        ReceiptValidationService.ActivationResult result = receiptValidationService
+                .restorePurchases(owner, store, receipt);
+        if (!result.activated()) {
             return ResponseEntity.ok(Map.of(
                     "restored", false,
-                    "reason", "no_prior_receipt",
+                    "reason", result.reason(),
                     "entitlements", service.entitlementState(owner)
             ));
         }
+
         service.assignPlan(owner, "PREMIUM");
         return ResponseEntity.ok(Map.of(
                 "restored", true,
-                "transactionId", tx,
+                "transactionId", result.transactionId(),
                 "entitlements", service.entitlementState(owner)
         ));
     }
@@ -134,5 +121,21 @@ public class EntitlementController {
     public ResponseEntity<?> consume(@PathVariable UUID userId, @RequestBody Map<String, String> body) {
         UUID owner = CurrentUser.requireSelfOrAdmin(userId);
         return ResponseEntity.ok(service.consumeQuota(owner, body.get("featureKey")));
+    }
+
+    private static String resolveStore(Map<String, Object> body) {
+        String platform = stringValue(body.get("platform"), "");
+        if (!platform.isBlank()) {
+            return platform;
+        }
+        return stringValue(body.get("store"), "app_store");
+    }
+
+    private static String stringValue(Object value, String defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        String text = String.valueOf(value);
+        return text.isBlank() ? defaultValue : text;
     }
 }

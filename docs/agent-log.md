@@ -4,9 +4,45 @@
 - **Tool:** cursor
 - **Branch:** cursor
 - **PR:** https://github.com/subh2312/quilore/pull/7
-- **What:** NIM adapter + live FastAPI invoke (heuristic fallback, no 503 stub); Spring AiGatewayClient; coach/workout/nutrition AI endpoints; user-scoped path aliases for mobile client; session summary + V8 migration; UAT_MOCK_RECEIPT billing flag; deploy/uat-pi.md.
+- **What:** Merge dev (PR #6) into cursor; keep NIM live invoke + Spring AiGatewayClient; adopt ReceiptValidationService + internal queue token from dev.
+- **Why:** PR #7 CI blocked by merge conflicts after PR #6 merged to dev; reconcile Wave 1A NIM gateway with security/billing fixes.
+- **How:** Resolved 19-file conflict set; NIM/heuristic invoke retained; dev billing mock-receipt + queue auth preserved; CI re-run pending.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
+- **Branch:** cursor
+- **PR:** https://github.com/subh2312/quilore/pull/7
+- **What:** NIM adapter + live FastAPI invoke (heuristic fallback, no 503 stub); Spring AiGatewayClient; coach/workout/nutrition AI endpoints; user-scoped path aliases for mobile client; session summary + V8 migration; deploy/uat-pi.md.
 - **Why:** Wave 1A backend — unblock live AI orchestration and gym UAT; client (PR #6) calls Spring Boot only, never FastAPI directly.
 - **How:** OpenAI-compatible NIM client; normalized invoke envelopes; Spring validates before persistence; path alignment (bcca9fd) for `/api/coach/{userId}/*` and `/api/workout/{userId}/*`; pytest 29 passed; AiGatewayAndWorkoutSessionTest + BacklogGapServicesTest BUILD SUCCESSFUL.
+
+- **Date:** 2026-08-12
+- **Tool:** copilot
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/6 — billing receipt validation security fix
+- **What:** Server-side receipt validation for `/api/billing/{userId}/purchase` and `/restore`; `subscription_receipts` persistence; billing properties; security regression tests.
+- **Why:** HIGH severity paywall bypass — client-supplied `transactionId` alone activated PREMIUM without store verification.
+- **How:** `ReceiptValidationService` derives transaction IDs from verified store/mock receipts, records validated receipts with unique `(store, transaction_id)`, rejects cross-user reuse; mock receipts gated behind `quilore.billing.allow-mock-receipts` (default false).
+
+- **Date:** 2026-08-12
+- **Tool:** copilot
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/6 — secure queue process-next route
+- **What:** Added internal API token guard for `POST /ai/queue/jobs/process-next`; config/env wiring and security tests.
+- **Why:** Agentic security review (MEDIUM): unauthenticated callers could mutate shared queue state by triggering job processing.
+- **How:** `require_internal_token` dependency validates `X-Internal-Token` or Bearer token against `AI_SERVICE_INTERNAL_TOKEN`; fail-closed when unset; pytest coverage for 401/503 paths.
+
+- **Date:** 2026-08-12
+- **Tool:** copilot (lead architect)
+- **Branch:** copilot
+- **PR:** https://github.com/subh2312/quilore/pull/6
+- **What:** Wave 1B/2C client — API layer, wired chat/nutrition/workout, PDF import UI, session summary card, admin alias console, WatermelonDB schema, ML Kit OCR + Whisper bridge, eas.json APK profile; CI ruff/eslint fixes.
+- **Why:** Client UAT APK + native parity per plan; extends PR #6 backlog UI with live Spring Boot wiring (not FastAPI direct).
+- **How:** `client/lib/api/*` with offline fallbacks; PdfImportPanel + SessionSummaryCard; admin stack gated SUPPORT; mock IAP hooks; ruff lint fixes for PR #6 ai-service gate.
+
+- **What:** Remaining Plane backlog gaps after PR #5 — client Design System UIs, privacy/flags/admin/goals/analytics/injury/reminders/billing activation APIs, AI queue/OCR/resilience/prompts; verified PR #5 stories as already done.
+- **Why:** Ordered backlog stories not covered by merged PR #5 (auth/nutrition engines/AI gateway 503/observability/CI) still needed product UI + release/privacy/admin surfaces.
+- **How:** Extend Spring Boot domain services (no JWT/quota/MinIO rewrites); add FastAPI queue/OCR/food-quality/prompts without changing Path B invoke 503; build RN screens/components per §4; Jest/pytest/BacklogGapServicesTest coverage.
 
 - **Date:** 2026-08-12
 - **Tool:** cursor

@@ -74,6 +74,7 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       HF_API_TOKEN: ${HF_API_TOKEN:-}
       NVIDIA_NIM_API_KEY: ${NVIDIA_NIM_API_KEY:-}
+      AI_SERVICE_INTERNAL_TOKEN: ${AI_SERVICE_INTERNAL_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

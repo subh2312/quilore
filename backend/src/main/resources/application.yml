@@ -75,7 +75,11 @@ quilore:
     connect-timeout-ms: 3000
     read-timeout-ms: 30000
   billing:
-    uat-mock-receipt: ${UAT_MOCK_RECEIPT:false}
+    # Staging/prod MUST leave false — mock receipts bypass store verification for UAT only.
+    allow-mock-receipts: ${QUILORE_ALLOW_MOCK_RECEIPTS:false}
+    mock-receipt-token: ${QUILORE_MOCK_RECEIPT_TOKEN:UAT_MOCK_RECEIPT}
+    apple-shared-secret: ${APPLE_SHARED_SECRET:}
+    google-play-package-name: ${GOOGLE_PLAY_PACKAGE_NAME:}
 
 minio:
   enabled: ${MINIO_ENABLED:false}
