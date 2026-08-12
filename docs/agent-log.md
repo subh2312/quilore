@@ -3,6 +3,14 @@
 - **Date:** 2026-08-12
 - **Tool:** copilot
 - **Branch:** copilot
+- **PR:** (pending) copilot → dev — billing receipt validation security fix
+- **What:** Server-side receipt validation for `/api/billing/{userId}/purchase` and `/restore`; `subscription_receipts` persistence; billing properties; security regression tests.
+- **Why:** HIGH severity paywall bypass — client-supplied `transactionId` alone activated PREMIUM without store verification.
+- **How:** `ReceiptValidationService` derives transaction IDs from verified store/mock receipts, records validated receipts with unique `(store, transaction_id)`, rejects cross-user reuse; mock receipts gated behind `quilore.billing.allow-mock-receipts` (default false).
+
+- **Date:** 2026-08-12
+- **Tool:** copilot
+- **Branch:** copilot
 - **PR:** https://github.com/subh2312/quilore/pull/6 — secure queue process-next route
 - **What:** Added internal API token guard for `POST /ai/queue/jobs/process-next`; config/env wiring and security tests.
 - **Why:** Agentic security review (MEDIUM): unauthenticated callers could mutate shared queue state by triggering job processing.
