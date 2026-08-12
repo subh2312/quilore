@@ -1,0 +1,16 @@
+# Staging overlay — pulls versioned images from GHCR instead of local builds.
+# Usage:
+#   export BACKEND_IMAGE=ghcr.io/<owner>/quilore-backend:staging-<sha>
+#   export AI_SERVICE_IMAGE=ghcr.io/<owner>/quilore-ai-service:staging-<sha>
+#   docker compose -f docker-compose.yml -f deploy/overlays/docker-compose.staging.yml up -d --no-build
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/subh2312/quilore-backend:staging}
+    environment:
+      SPRING_PROFILES_ACTIVE: staging
+
+  ai-service:
+    image: ${AI_SERVICE_IMAGE:-ghcr.io/subh2312/quilore-ai-service:staging}
+    environment:
+      ENVIRONMENT: staging

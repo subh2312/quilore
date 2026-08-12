@@ -79,7 +79,27 @@ Also append a short entry to `docs/agent-log.md` (newest entry on top) with the 
 
 ## Dev Environment, Build, and Test Commands
 
-_Not yet populated — this repo is pre-scaffold. When you add `/client`, `/backend`, or `/ai-service`, add their install/run/lint/test commands here so every agent (and every human) uses the same commands._
+Local stack (Postgres, MinIO, backend, AI service):
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+| Service | Install | Lint | Test | Run |
+|---|---|---|---|---|
+| Backend (`/backend`) | JDK 21 + `./gradlew` wrapper | — | `./gradlew test` | `./gradlew bootRun` (or compose `backend`) |
+| AI service (`/ai-service`) | `pip install -r requirements.txt` | `ruff check .` | `pytest tests/ -v` | `uvicorn app.main:app --reload --port 8000` |
+| Client (`/client`) | `npm install` | `npx eslint . --max-warnings 0` | `npm test` (+ `npx tsc --noEmit`) | `npx expo start` |
+| Deploy tooling (`/deploy`) | — | — | `bash deploy/tests/test_promote_rollback.sh` | see `deploy/README.md` |
+
+CI/CD overview (Story 16.4): PR checks in `.github/workflows/ci.yml`; versioned GHCR publish in `publish-images.yml`; staging→production promotion in `promote.yml`; production rollback in `rollback.yml`. Details: `deploy/README.md`.
+
+Automated contracts (Story 16.3): backend MockMvc API contracts, AI gateway normalized envelope pytest contracts, client critical-journey Jest contracts (Maestro YAML under `client/e2e/` for device runs).
+
+Observability (Story 16.1): JSON structured logs with `X-Correlation-ID` / `traceparent`, Prometheus metrics (`/actuator/prometheus`, `/metrics`), job trace helpers, and sensitive-data redaction. Local scrape config: `deploy/observability/prometheus.yml`.
+
+Security baseline (Stories 15.1–15.2): RBAC roles `USER`/`SUPPORT`/`ADMIN` with `/api/admin/**` gates + permission audit; TLS via Caddy overlay; secret rotation script (`deploy/scripts/rotate-secrets.sh`); AES-GCM `FieldEncryptor` keyed by `DATA_ENCRYPTION_KEY`. See `deploy/secrets/README.md`.
 
 ## PR / Commit Conventions
 

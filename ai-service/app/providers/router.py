@@ -10,10 +10,11 @@ Implements the fallback matrix from docs/quilore_document_set.md §3.6:
 from enum import StrEnum
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
+from app.providers.contracts import InvokeRequest, NormalizedAIResponse
 
 router = APIRouter()
 
@@ -114,3 +115,68 @@ async def route_task(task_type: TaskType) -> RouteResponse:
         message="No providers configured for this task. "
         "Results will be queued and processed when a provider becomes available.",
     )
+
+
+def _normalize_result(
+    task_type: TaskType,
+    *,
+    provider: str | None,
+    chain: list[str],
+    content: Any | None,
+    message: str,
+    degraded: bool,
+) -> NormalizedAIResponse:
+    """Build the shared response envelope used by all invoke paths."""
+    fallback_used = bool(provider and chain and provider != chain[0])
+    return NormalizedAIResponse(
+        task=task_type.value,
+        provider=provider,
+        fallback_used=fallback_used,
+        degraded=degraded,
+        content=content,
+        confidence=None if degraded else 0.5,
+        message=message,
+        editable=True,
+        user_confirmation_required=True,
+    )
+
+
+@router.post("/tasks/{task_type}/invoke", response_model=NormalizedAIResponse)
+async def invoke_task(
+    task_type: TaskType,
+    body: InvokeRequest | None = None,
+) -> NormalizedAIResponse:
+    """Invoke an AI task — live provider adapters are deferred (B5 Path B).
+
+    Never returns a fake successful inference. Clients receive HTTP 503 with an
+    explicit unavailable/deferred envelope until real adapters are wired.
+    """
+    request = body or InvokeRequest()
+    chain = FALLBACK_MATRIX.get(task_type, [])
+    selected = None
+    for provider in chain:
+        if _provider_available(provider):
+            selected = provider
+            break
+
+    envelope = _normalize_result(
+        task_type,
+        provider=selected,
+        chain=chain,
+        content={
+            "status": "unavailable",
+            "reason": "deferred",
+            "input_keys": sorted(request.input.keys()),
+            "selected_provider": selected,
+            "note": (
+                "Live inference adapters are not implemented. "
+                "This endpoint does not fabricate successful AI results."
+            ),
+        },
+        message=(
+            "Live AI inference is deferred/unavailable. "
+            "No provider adapter call was made; do not treat this as a completed analysis."
+        ),
+        degraded=True,
+    )
+    raise HTTPException(status_code=503, detail=envelope.model_dump())

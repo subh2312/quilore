@@ -4,11 +4,45 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+    hikari:
+      maximum-pool-size: 40
 
   jpa:
     hibernate:
       ddl-auto: create-drop
     database-platform: org.hibernate.dialect.H2Dialect
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
 
   flyway:
     enabled: false
+
+quilore:
+  security:
+    jwt-secret: test-only-jwt-secret-must-be-32chars
+    jwt-issuer: quilore-test
+    jwt-audience: quilore-api-test
+    # 32 zero bytes — allowed only because allow-insecure-defaults is true in tests
+    data-encryption-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    allow-insecure-defaults: true
+
+minio:
+  enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - prometheus
+          - metrics
+  endpoint:
+    prometheus:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true

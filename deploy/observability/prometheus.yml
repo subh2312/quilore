@@ -1,0 +1,24 @@
+# Optional Prometheus scrape config for local / staging dashboards (Story 16.1).
+# Usage:
+#   docker run --rm -p 9090:9090 -v $PWD/deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml \
+#     prom/prometheus
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: quilore-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+        labels:
+          service: quilore-backend
+          env: local
+
+  - job_name: quilore-ai-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          service: quilore-ai-service
+          env: local

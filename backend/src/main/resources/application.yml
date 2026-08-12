@@ -34,4 +34,46 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include:
+          - health
+          - info
+          - prometheus
+          - metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+    prometheus:
+      enabled: true
+    metrics:
+      enabled: true
+  metrics:
+    tags:
+      application: quilore-backend
+  observations:
+    key-values:
+      service: quilore-backend
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.quilore: INFO
+
+quilore:
+  security:
+    data-encryption-key: ${DATA_ENCRYPTION_KEY:}
+    jwt-secret: ${JWT_SECRET:}
+    jwt-issuer: ${JWT_ISSUER:quilore}
+    jwt-audience: ${JWT_AUDIENCE:quilore-api}
+    # Staging/prod MUST leave this false. Dev/test may set true only with explicit profile.
+    allow-insecure-defaults: ${QUILORE_ALLOW_INSECURE_DEFAULTS:false}
+
+minio:
+  enabled: ${MINIO_ENABLED:false}
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  bucket: ${MINIO_BUCKET:quilore-media}
+  access-key: ${MINIO_ROOT_USER:quilore_minio}
+  secret-key: ${MINIO_ROOT_PASSWORD:}
