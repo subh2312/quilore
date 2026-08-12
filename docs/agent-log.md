@@ -2,6 +2,14 @@
 
 - **Date:** 2026-08-12
 - **Tool:** cursor
+- **Branch:** cursor-uat-pi-cloudflare-b3f3
+- **PR:** https://github.com/subh2312/quilore/pull/10
+- **What:** Switched GHCR publish to **linux/arm64 only** (no amd64); added `deploy/k8s/uat` manifests + README; rewrote UAT docs to prefer Actions→GHCR→k3s over cloning/building on the Pi.
+- **Why:** Deploy target is Raspberry Pi / ARM forever; amd64 images and on-Pi monorepo builds were the wrong path and competed with Hermes/HA.
+- **How:** `publish-images.yml` QEMU + `platforms: linux/arm64`; k8s Namespace/StatefulSet/Deployments modeled on saleboomseo; compose marked fallback only.
+
+- **Date:** 2026-08-12
+- **Tool:** cursor
 - **Branch:** cursor/uat-pi-cloudflare-b3f3
 - **PR:** https://github.com/subh2312/quilore/pull/10
 - **What:** Added `deploy/overlays/docker-compose.uat.yml` (injects JWT/encryption/internal-token/mock-IAP into containers) and rewrote `deploy/uat-pi.md` for Cloudflare Tunnel UAT on Pi, clarifying mock-receipt naming.
