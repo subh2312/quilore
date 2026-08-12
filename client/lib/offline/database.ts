@@ -1,30 +1,30 @@
 /**
- * WatermelonDB SQLite adapter — used in dev client / release APK, not Jest.
+ * WatermelonDB SQLite adapter — lazy-loaded in native builds only (not Jest).
  */
 
-import { Database } from '@nozbe/watermelondb';
-import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
+import type { Database } from "@nozbe/watermelondb";
 
-import { offlineSchema } from './schema';
-import { modelClasses } from './models';
-
-let database: Database | null = null;
+let db: Database | null = null;
 
 export function getWatermelonDatabase(): Database | null {
-  if (database) return database;
+  if (process.env.JEST_WORKER_ID !== undefined) return null;
+  if (db) return db;
   try {
-    const adapter = new SQLiteAdapter({
-      schema: offlineSchema,
-      dbName: 'quilore_offline',
-      jsi: true,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Database: WMDatabase } = require("@nozbe/watermelondb");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const SQLiteAdapter = require("@nozbe/watermelondb/adapters/sqlite").default;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { schema } = require("./schema");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { MealRecord, PlanRecord, SyncQueueRecord, WorkoutRecord } = require("./models");
+    const adapter = new SQLiteAdapter({ schema, jsi: false, dbName: "quilore" });
+    db = new WMDatabase({
+      adapter,
+      modelClasses: [WorkoutRecord, MealRecord, PlanRecord, SyncQueueRecord],
     });
-    database = new Database({ adapter, modelClasses });
-    return database;
+    return db;
   } catch {
     return null;
   }
-}
-
-export function resetWatermelonForTests() {
-  database = null;
 }

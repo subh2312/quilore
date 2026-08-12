@@ -1,115 +1,113 @@
 /**
- * Offline-first local cache + mutation queue (Story 12.1 / WatermelonDB-shaped).
- * In-memory + serializable store for Jest/Expo without native Watermelon binding.
+ * Offline-first local cache + mutation queue (WatermelonDB + sync to Spring Boot).
+ * Jest uses in-memory backend; native builds persist via SQLite.
  */
 
-import { MealRecord, PlanRecord, SyncQueueRecord, WorkoutRecord } from './models';
+import { getWatermelonDatabase } from "./database";
+import { SyncQueueRecord, WorkoutRecord } from "./models";
+import * as memory from "./memoryStore";
 
-export const LOCAL_SCHEMA_VERSION = 1;
+export const LOCAL_SCHEMA_VERSION = memory.LOCAL_SCHEMA_VERSION;
+export type PendingMutation = memory.PendingMutation;
 
-export type PendingMutation = {
-  id: string;
-  collection: string;
-  op: 'create' | 'update' | 'delete';
-  payload: Record<string, unknown>;
-  createdAt: string;
+const COLLECTION_TABLE: Record<string, string> = {
+  workouts: "workouts",
+  meals: "meals",
+  plans: "plans",
 };
 
-type Collection = Record<string, Record<string, unknown>>;
+function useMemoryOnly() {
+  return process.env.JEST_WORKER_ID !== undefined;
+}
 
-type Snapshot = {
-  schemaVersion: number;
-  collections: Record<string, Collection>;
-  pending: PendingMutation[];
-  lastSyncAt: string | null;
-};
-
-let state: Snapshot = {
-  schemaVersion: LOCAL_SCHEMA_VERSION,
-  collections: { workouts: {}, meals: {}, plans: {} },
-  pending: [],
-  lastSyncAt: null,
-};
+async function persistRow(collection: string, id: string, row: Record<string, unknown>, enqueue: boolean) {
+  const db = getWatermelonDatabase();
+  if (!db || useMemoryOnly()) return;
+  const table = COLLECTION_TABLE[collection];
+  if (!table) return;
+  const payloadJson = JSON.stringify({ id, ...row });
+  const now = Date.now();
+  await db.write(async () => {
+    const records = await db.get(table).query().fetch();
+    const existing = records.find((r) => r.id === id);
+    if (existing) {
+      await existing.update((rec) => {
+        (rec as unknown as WorkoutRecord).payloadJson = payloadJson;
+        (rec as unknown as WorkoutRecord).updatedAt = now;
+      });
+    } else {
+      await db.get(table).create((rec) => {
+        rec._raw.id = id;
+        (rec as unknown as WorkoutRecord).payloadJson = payloadJson;
+        (rec as unknown as WorkoutRecord).updatedAt = now;
+      });
+    }
+    if (enqueue) {
+      await db.get<SyncQueueRecord>("sync_queue").create((rec) => {
+        rec.collectionName = collection;
+        rec.op = "create";
+        rec.payloadJson = payloadJson;
+        rec.createdAt = now;
+      });
+    }
+  });
+}
 
 export function resetOfflineStore() {
-  state = {
-    schemaVersion: LOCAL_SCHEMA_VERSION,
-    collections: { workouts: {}, meals: {}, plans: {} },
-    pending: [],
-    lastSyncAt: null,
-  };
+  memory.resetOfflineStore();
 }
 
 export function upsertLocal(collection: string, id: string, row: Record<string, unknown>, enqueue = true) {
-  if (!state.collections[collection]) state.collections[collection] = {};
-  state.collections[collection][id] = { ...row, id };
-  if (enqueue) {
-    state.pending.push({
-      id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      collection,
-      op: 'create',
-      payload: { id, ...row },
-      createdAt: new Date().toISOString(),
-    });
+  memory.upsertLocal(collection, id, row, enqueue);
+  if (!useMemoryOnly()) {
+    void persistRow(collection, id, row, enqueue).catch(() => undefined);
   }
 }
 
 export function listLocal(collection: string) {
-  return Object.values(state.collections[collection] ?? {});
+  return memory.listLocal(collection);
 }
 
-export function pendingMutations() {
-  return [...state.pending];
+export function pendingMutations(): PendingMutation[] {
+  return memory.pendingMutations();
 }
 
 export function markSynced(mutationIds: string[]) {
-  const drop = new Set(mutationIds);
-  state.pending = state.pending.filter((m) => !drop.has(m.id));
-  state.lastSyncAt = new Date().toISOString();
+  memory.markSynced(mutationIds);
 }
 
 export function migrateIfNeeded(fromVersion: number) {
-  if (fromVersion >= LOCAL_SCHEMA_VERSION) return state.schemaVersion;
-  if (!state.collections.plans) state.collections.plans = {};
-  state.schemaVersion = LOCAL_SCHEMA_VERSION;
-  return state.schemaVersion;
+  return memory.migrateIfNeeded(fromVersion);
 }
 
-export function getOfflineSnapshot(): Snapshot {
-  return JSON.parse(JSON.stringify(state));
+export function getOfflineSnapshot() {
+  return memory.getOfflineSnapshot();
 }
 
-/** Load persisted rows from WatermelonDB into the in-memory cache when available. */
-export async function hydrateFromDatabase(): Promise<void> {
-  try {
-    const { getWatermelonDatabase } = await import('./database');
-    const db = getWatermelonDatabase();
-    if (!db) return;
+export function isMemoryBackend() {
+  return useMemoryOnly() || getWatermelonDatabase() === null;
+}
 
-    const loadCollection = async (collection: string, rows: WorkoutRecord[] | MealRecord[] | PlanRecord[]) => {
-      for (const row of rows) {
-        const payload = JSON.parse(row.payloadJson) as Record<string, unknown>;
-        const id = row.remoteId ?? row.id;
-        upsertLocal(collection, id, payload, false);
-      }
-    };
-
-    await loadCollection('workouts', await db.get('workouts').query().fetch() as WorkoutRecord[]);
-    await loadCollection('meals', await db.get('meals').query().fetch() as MealRecord[]);
-    await loadCollection('plans', await db.get('plans').query().fetch() as PlanRecord[]);
-
-    const queue = await db.get('sync_queue').query().fetch();
-    for (const rec of queue) {
-      const row = rec as SyncQueueRecord;
-      state.pending.push({
-        id: row.id,
-        collection: row.collectionName,
-        op: row.op as PendingMutation['op'],
-        payload: JSON.parse(row.payloadJson) as Record<string, unknown>,
-        createdAt: new Date(row.createdAt).toISOString(),
-      });
+export async function hydrateFromDatabase() {
+  const db = getWatermelonDatabase();
+  if (!db || useMemoryOnly()) return;
+  memory.resetOfflineStore();
+  for (const [collection, table] of Object.entries(COLLECTION_TABLE)) {
+    const rows = await db.get(table).query().fetch();
+    for (const row of rows) {
+      const payload = JSON.parse((row as unknown as WorkoutRecord).payloadJson) as Record<string, unknown>;
+      const id = String(payload.id ?? row.id);
+      memory.upsertLocal(collection, id, payload, false);
     }
-  } catch {
-    // Native SQLite unavailable (Jest, web, Expo Go without dev client).
+  }
+  const queue = await db.get<SyncQueueRecord>("sync_queue").query().fetch();
+  for (const item of queue) {
+    memory.enqueuePending({
+      id: item.id,
+      collection: item.collectionName,
+      op: item.op as PendingMutation["op"],
+      payload: JSON.parse(item.payloadJson),
+      createdAt: new Date(item.createdAt).toISOString(),
+    });
   }
 }
