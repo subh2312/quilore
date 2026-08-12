@@ -43,11 +43,21 @@ class AiJobQueue:
         self._idempotency: dict[str, str] = {}
         self._lock = Lock()
 
-    def enqueue(self, task_type: str, payload: dict[str, Any], idempotency_key: str | None = None) -> Job:
+    def enqueue(
+        self,
+        task_type: str,
+        payload: dict[str, Any],
+        idempotency_key: str | None = None,
+    ) -> Job:
         with self._lock:
             if idempotency_key and idempotency_key in self._idempotency:
                 return self._jobs[self._idempotency[idempotency_key]]
-            job = Job(id=str(uuid4()), task_type=task_type, payload=payload, idempotency_key=idempotency_key)
+            job = Job(
+                id=str(uuid4()),
+                task_type=task_type,
+                payload=payload,
+                idempotency_key=idempotency_key,
+            )
             self._jobs[job.id] = job
             if idempotency_key:
                 self._idempotency[idempotency_key] = job.id

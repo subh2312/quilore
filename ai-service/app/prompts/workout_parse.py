@@ -1,6 +1,7 @@
 """Groq-oriented structured workout parse prompt (Story NLP prompt)."""
 
-WORKOUT_PARSE_SYSTEM = """You are Quilore's workout parser. Convert natural-language gym logs into JSON.
+WORKOUT_PARSE_SYSTEM = """You are Quilore's workout parser.
+Convert natural-language gym logs into JSON.
 Rules:
 - Output ONLY JSON with keys: exercises[], unresolved[], confidence, editable=true.
 - Each exercise: name, sets, reps, load (nullable), unit, notes.

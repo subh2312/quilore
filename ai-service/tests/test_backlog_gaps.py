@@ -3,15 +3,14 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.ocr.mapper import map_ocr_text_to_schema
 from app.nutrition.food_quality import food_quality_feedback
+from app.ocr.mapper import map_ocr_text_to_schema
 from app.prompts.workout_parse import build_workout_parse_prompt, recover_from_parse_error
 from app.resilience.provider_resilience import (
     ProviderTransientError,
     call_with_resilience,
     get_breaker,
 )
-
 
 client = TestClient(app)
 

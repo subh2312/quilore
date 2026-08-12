@@ -9,17 +9,17 @@ from starlette.responses import Response
 
 from app.config import settings
 from app.exercises.router import router as exercises_router
+from app.nutrition.router import router as nutrition_router
 from app.observability.logging import configure_logging, get_logger, job_trace
 from app.observability.middleware import (
     ObservabilityMiddleware,
     refresh_provider_health_metrics,
 )
+from app.ocr.router import router as ocr_router
 from app.pose.router import router as pose_router
+from app.prompts.router import router as prompts_router
 from app.providers.router import router as providers_router
 from app.queue.router import router as queue_router
-from app.ocr.router import router as ocr_router
-from app.nutrition.router import router as nutrition_router
-from app.prompts.router import router as prompts_router
 from app.resilience.provider_resilience import get_breaker
 
 configure_logging()

@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 EXERCISE_LINE = re.compile(
     r"^(?P<name>[A-Za-z][A-Za-z0-9 \-/]+?)\s+"
     r"(?P<sets>\d+)\s*[xX×]\s*(?P<reps>\d+)"
