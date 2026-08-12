@@ -3,7 +3,7 @@
 - **Date:** 2026-08-12
 - **Tool:** cursor
 - **Branch:** cursor
-- **PR:** (pending) cursor → dev — NIM + Spring AI gateway Wave 1A
+- **PR:** https://github.com/subh2312/quilore/pull/7
 - **What:** NIM adapter + live FastAPI invoke (heuristic fallback, no 503 stub); Spring AiGatewayClient; coach/workout/nutrition AI endpoints; user-scoped path aliases for mobile client; session summary + V8 migration; UAT_MOCK_RECEIPT billing flag; deploy/uat-pi.md.
 - **Why:** Wave 1A backend — unblock live AI orchestration and gym UAT; client (PR #6) calls Spring Boot only, never FastAPI directly.
 - **How:** OpenAI-compatible NIM client; normalized invoke envelopes; Spring validates before persistence; path alignment (bcca9fd) for `/api/coach/{userId}/*` and `/api/workout/{userId}/*`; pytest 29 passed; AiGatewayAndWorkoutSessionTest + BacklogGapServicesTest BUILD SUCCESSFUL.
