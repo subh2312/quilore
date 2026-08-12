@@ -99,14 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    const refreshToken = await getStoredRefreshToken();
-    if (refreshToken) {
-      await apiLogout(refreshToken);
-    } else {
-      await clearStoredSession();
+    try {
+      const refreshToken = await getStoredRefreshToken();
+      if (refreshToken) {
+        await apiLogout(refreshToken);
+      } else {
+        await clearStoredSession();
+      }
+    } finally {
+      setUser(null);
+      setOnboardingComplete(false);
     }
-    setUser(null);
-    setOnboardingComplete(false);
   }, []);
 
   const markOnboardingComplete = useCallback(async () => {
