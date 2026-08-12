@@ -32,3 +32,8 @@ export function stopListening(): PartialTranscript {
 export function isListening() {
   return listening;
 }
+
+/** Display label for the active on-device transcription engine. */
+export function getWhisperEngineName(): PartialTranscript['engine'] {
+  return 'stub';
+}

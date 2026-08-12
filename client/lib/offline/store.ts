@@ -3,6 +3,8 @@
  * In-memory + serializable store for Jest/Expo without native Watermelon binding.
  */
 
+import { MealRecord, PlanRecord, SyncQueueRecord, WorkoutRecord } from './models';
+
 export const LOCAL_SCHEMA_VERSION = 1;
 
 export type PendingMutation = {
@@ -75,4 +77,39 @@ export function migrateIfNeeded(fromVersion: number) {
 
 export function getOfflineSnapshot(): Snapshot {
   return JSON.parse(JSON.stringify(state));
+}
+
+/** Load persisted rows from WatermelonDB into the in-memory cache when available. */
+export async function hydrateFromDatabase(): Promise<void> {
+  try {
+    const { getWatermelonDatabase } = await import('./database');
+    const db = getWatermelonDatabase();
+    if (!db) return;
+
+    const loadCollection = async (collection: string, rows: WorkoutRecord[] | MealRecord[] | PlanRecord[]) => {
+      for (const row of rows) {
+        const payload = JSON.parse(row.payloadJson) as Record<string, unknown>;
+        const id = row.remoteId ?? row.id;
+        upsertLocal(collection, id, payload, false);
+      }
+    };
+
+    await loadCollection('workouts', await db.get('workouts').query().fetch() as WorkoutRecord[]);
+    await loadCollection('meals', await db.get('meals').query().fetch() as MealRecord[]);
+    await loadCollection('plans', await db.get('plans').query().fetch() as PlanRecord[]);
+
+    const queue = await db.get('sync_queue').query().fetch();
+    for (const rec of queue) {
+      const row = rec as SyncQueueRecord;
+      state.pending.push({
+        id: row.id,
+        collection: row.collectionName,
+        op: row.op as PendingMutation['op'],
+        payload: JSON.parse(row.payloadJson) as Record<string, unknown>,
+        createdAt: new Date(row.createdAt).toISOString(),
+      });
+    }
+  } catch {
+    // Native SQLite unavailable (Jest, web, Expo Go without dev client).
+  }
 }
