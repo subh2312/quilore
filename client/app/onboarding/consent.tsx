@@ -1,32 +1,69 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { router } from 'expo-router';
 import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
 import { setAnalyticsConsent, track } from '@/lib/analytics';
 import { setCrashReportingEnabled } from '@/lib/crashReporting';
+import { recordConsent, savePrivacyPreferences } from '@/lib/api/profile';
+import { saveOnboardingDraft } from '@/lib/onboarding/storage';
+import { useAuth } from '@/context/AuthContext';
 
 export default function ConsentOnboardingScreen() {
+  const { user } = useAuth();
   const [terms, setTerms] = useState(false);
   const [aiDisclaimer, setAiDisclaimer] = useState(false);
   const [injuryDisclaimer, setInjuryDisclaimer] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [crash, setCrash] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const requiredOk = terms && aiDisclaimer && injuryDisclaimer;
 
-  function complete() {
-    if (!requiredOk) return;
-    setAnalyticsConsent(analytics);
-    setCrashReportingEnabled(crash);
-    track('onboarding_completed', { analytics, crash });
-    router.replace('/(tabs)/profile');
+  useEffect(() => {
+    if (!user) return;
+    void saveOnboardingDraft(user.id, { consentsAccepted: false });
+  }, [user]);
+
+  async function complete() {
+    if (!requiredOk || busy || !user) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setAnalyticsConsent(analytics);
+      setCrashReportingEnabled(crash);
+
+      // Required consents are fail-closed: recordConsent throws when Spring Boot is unavailable.
+      await Promise.all([
+        recordConsent(user.id, 'terms_of_use', true),
+        recordConsent(user.id, 'ai_editable_disclaimer', true),
+        recordConsent(user.id, 'injury_risk_flag_disclaimer', true),
+      ]);
+      // Optional prefs may degrade offline without blocking onboarding.
+      await savePrivacyPreferences(user.id, { analyticsOptIn: analytics, crashReportingOptIn: crash });
+
+      await saveOnboardingDraft(user.id, { consentsAccepted: true });
+      track('onboarding_completed', { step: 'consent', analytics, crash });
+      router.push('/onboarding/profile-baseline');
+    } catch (err) {
+      const message =
+        err instanceof Error && /network|offline|unavailable/i.test(err.message)
+          ? 'Server unavailable. Required consents must be saved online before continuing.'
+          : err instanceof Error
+            ? err.message
+            : 'Could not save consent. Please try again.';
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.step}>Step 2 of 4</Text>
       <Text style={styles.title}>Consent & privacy</Text>
       <Text style={styles.body}>
-        Required terms must be accepted before onboarding completes. Medical-risk features are
+        Required terms must be accepted before onboarding continues. Medical-risk features are
         non-diagnostic risk flags only.
       </Text>
 
@@ -47,11 +84,12 @@ export default function ConsentOnboardingScreen() {
       <ToggleRow label="Optional: crash reporting" value={crash} onChange={setCrash} />
 
       <Pressable
-        style={[styles.primary, !requiredOk && styles.disabled]}
-        disabled={!requiredOk}
+        style={[styles.primary, (!requiredOk || busy) && styles.disabled]}
+        disabled={!requiredOk || busy}
         onPress={complete}>
-        <Text style={styles.primaryText}>Continue</Text>
+        <Text style={styles.primaryText}>{busy ? 'Saving…' : 'Continue'}</Text>
       </Pressable>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </ScrollView>
   );
 }
@@ -68,7 +106,11 @@ function ToggleRow({
   required?: boolean;
 }) {
   return (
-    <Pressable style={styles.row} onPress={() => onChange(!value)}>
+    <Pressable
+      style={styles.row}
+      onPress={() => onChange(!value)}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: value }}>
       <Text style={styles.check}>{value ? '☑' : '☐'}</Text>
       <Text style={styles.rowLabel}>
         {label}
@@ -80,6 +122,7 @@ function ToggleRow({
 
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 },
+  step: { color: palette.emeraldDark, fontWeight: '700', fontSize: typography.fontSize.sm },
   title: { fontSize: typography.fontSize.xl, fontWeight: '700', color: palette.gray900 },
   body: { fontSize: typography.fontSize.sm, color: palette.gray600, lineHeight: 20 },
   row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
@@ -95,4 +138,5 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.5 },
   primaryText: { color: palette.white, fontWeight: '700' },
+  error: { color: palette.red, fontWeight: '600' },
 });

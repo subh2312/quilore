@@ -3,6 +3,7 @@ export * from "./types";
 export * from "./client";
 export * from "./authStorage";
 export * from "./auth";
+export * from "./profile";
 export * from "./coach";
 export * from "./nutrition";
 export * from "./workout";
