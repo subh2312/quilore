@@ -67,8 +67,12 @@ def test_route_all_task_types_return_contract():
         assert "message" in data
 
 
-def test_invoke_returns_heuristic_envelope_without_keys():
-    response = client.post("/ai/tasks/chat/invoke", json={"input": {"prompt": "suggest a deload"}})
+def test_invoke_returns_heuristic_envelope_without_keys(internal_auth_headers):
+    response = client.post(
+        "/ai/tasks/chat/invoke",
+        json={"input": {"prompt": "suggest a deload"}},
+        headers=internal_auth_headers,
+    )
     assert response.status_code == 200
     data = response.json()
     assert REQUIRED_ENVELOPE_FIELDS <= set(data.keys())
@@ -77,9 +81,13 @@ def test_invoke_returns_heuristic_envelope_without_keys():
     NormalizedAIResponse.model_validate(data)
 
 
-def test_invoke_all_task_types_return_envelope_not_503():
+def test_invoke_all_task_types_return_envelope_not_503(internal_auth_headers):
     for task in TaskType:
-        response = client.post(f"/ai/tasks/{task.value}/invoke", json={"input": {}})
+        response = client.post(
+            f"/ai/tasks/{task.value}/invoke",
+            json={"input": {}},
+            headers=internal_auth_headers,
+        )
         assert response.status_code == 200, task
         data = response.json()
         assert data["editable"] is True
@@ -88,13 +96,17 @@ def test_invoke_all_task_types_return_envelope_not_503():
         NormalizedAIResponse.model_validate(data)
 
 
-def test_invoke_live_envelope_when_nim_mocked():
+def test_invoke_live_envelope_when_nim_mocked(internal_auth_headers):
     with patch("app.providers.router._provider_available", return_value=True):
         with patch(
             "app.providers.router.call_with_resilience",
             return_value={"ok": True, "result": {"reply": "Deload week."}},
         ):
-            response = client.post("/ai/tasks/chat/invoke", json={"input": {"prompt": "hi"}})
+            response = client.post(
+                "/ai/tasks/chat/invoke",
+                json={"input": {"prompt": "hi"}},
+                headers=internal_auth_headers,
+            )
     data = response.json()
     assert data["degraded"] is False
     assert data["provider"] == "nvidia_nim"

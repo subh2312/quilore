@@ -91,8 +91,12 @@ def test_resilience_circuit_opens_after_failures():
     assert blocked["ok"] is False
 
 
-def test_invoke_returns_live_or_heuristic_not_503():
-    res = client.post("/ai/tasks/chat/invoke", json={"input": {"prompt": "hi"}})
+def test_invoke_returns_live_or_heuristic_not_503(internal_auth_headers):
+    res = client.post(
+        "/ai/tasks/chat/invoke",
+        json={"input": {"prompt": "hi"}},
+        headers=internal_auth_headers,
+    )
     assert res.status_code == 200
     assert "reply" in res.json()["content"]
 

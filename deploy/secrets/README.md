@@ -16,7 +16,7 @@
 | `JWT_SECRET` | Spring Boot | Min 32 chars; rotating invalidates sessions |
 | `DATA_ENCRYPTION_KEY` | Spring Boot | Base64 of 32 random bytes; rotating requires re-encrypt job |
 | `GROQ_API_KEY` / `OPENROUTER_API_KEY` / `HF_API_TOKEN` / `NVIDIA_NIM_API_KEY` | AI service | Rotate at provider console |
-| `AI_SERVICE_INTERNAL_TOKEN` | AI service / workers | Shared secret for internal queue routes (`/ai/queue/jobs*`) |
+| `AI_SERVICE_INTERNAL_TOKEN` | AI service / Spring Boot backend | Shared secret for internal AI routes (`/ai/queue/*`, `/ai/tasks/*/invoke`) |
 
 ## TLS overlay
 

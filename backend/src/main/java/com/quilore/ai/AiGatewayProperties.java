@@ -6,7 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AiGatewayProperties(
         String serviceUrl,
         int connectTimeoutMs,
-        int readTimeoutMs
+        int readTimeoutMs,
+        String internalApiToken
 ) {
     public AiGatewayProperties {
         if (serviceUrl == null || serviceUrl.isBlank()) {
@@ -17,6 +18,9 @@ public record AiGatewayProperties(
         }
         if (readTimeoutMs <= 0) {
             readTimeoutMs = 30000;
+        }
+        if (internalApiToken == null) {
+            internalApiToken = "";
         }
     }
 }

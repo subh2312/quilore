@@ -55,6 +55,8 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-quilore_minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-quilore_minio_secret}
+      AI_SERVICE_URL: http://ai-service:8000
+      AI_SERVICE_INTERNAL_TOKEN: ${AI_SERVICE_INTERNAL_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

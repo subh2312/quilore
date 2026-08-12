@@ -17,9 +17,12 @@ public class AiGatewayConfig {
     public WebClient aiServiceWebClient(AiGatewayProperties properties) {
         HttpClient httpClient = HttpClient.create()
                 .responseTimeout(Duration.ofMillis(properties.readTimeoutMs()));
-        return WebClient.builder()
+        var builder = WebClient.builder()
                 .baseUrl(properties.serviceUrl())
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .build();
+                .clientConnector(new ReactorClientHttpConnector(httpClient));
+        if (!properties.internalApiToken().isBlank()) {
+            builder.defaultHeader("X-Internal-Token", properties.internalApiToken());
+        }
+        return builder.build();
     }
 }

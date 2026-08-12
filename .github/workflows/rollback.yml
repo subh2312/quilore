@@ -43,12 +43,18 @@ jobs:
 
       - name: Derive image names
         id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
+          if ! echo "$INPUT_VERSION" | grep -Eq '^(staging-[a-f0-9]+|v[0-9]+\.[0-9]+\.[0-9]+)$'; then
+            echo "Refusing rollback: version must match staging-<sha> or vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
           OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
           {
             echo "backend=${{ env.REGISTRY }}/${OWNER}/quilore-backend"
             echo "ai=${{ env.REGISTRY }}/${OWNER}/quilore-ai-service"
-            echo "version=${{ inputs.version }}"
+            echo "version=${INPUT_VERSION}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR

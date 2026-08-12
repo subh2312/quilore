@@ -4,13 +4,14 @@ import json
 from enum import StrEnum
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.config import settings
 from app.providers import nim_client
 from app.providers.contracts import InvokeRequest, NormalizedAIResponse
 from app.resilience.provider_resilience import call_with_resilience
+from app.security.internal_auth import require_internal_token
 
 router = APIRouter()
 
@@ -220,7 +221,11 @@ def _normalize_result(
     )
 
 
-@router.post("/tasks/{task_type}/invoke", response_model=NormalizedAIResponse)
+@router.post(
+    "/tasks/{task_type}/invoke",
+    response_model=NormalizedAIResponse,
+    dependencies=[Depends(require_internal_token)],
+)
 async def invoke_task(
     task_type: TaskType,
     body: InvokeRequest | None = None,
