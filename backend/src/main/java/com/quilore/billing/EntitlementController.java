@@ -20,10 +20,16 @@ import java.util.UUID;
 public class EntitlementController {
 
     private final EntitlementService service;
+    private final ReceiptValidationService receiptValidationService;
     private final PermissionAuditService permissionAuditService;
 
-    public EntitlementController(EntitlementService service, PermissionAuditService permissionAuditService) {
+    public EntitlementController(
+            EntitlementService service,
+            ReceiptValidationService receiptValidationService,
+            PermissionAuditService permissionAuditService
+    ) {
         this.service = service;
+        this.receiptValidationService = receiptValidationService;
         this.permissionAuditService = permissionAuditService;
     }
 
@@ -60,9 +66,76 @@ public class EntitlementController {
         return ResponseEntity.ok(service.entitlementState(userId));
     }
 
+    @PostMapping("/billing/{userId}/purchase")
+    public ResponseEntity<?> purchase(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        String productId = stringValue(body.get("productId"), "premium_monthly");
+        String store = resolveStore(body);
+        String receipt = stringValue(body.get("receipt"), "");
+
+        ReceiptValidationService.ActivationResult result = receiptValidationService
+                .activatePurchase(owner, store, productId, receipt);
+        if (!result.activated()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "activated", false,
+                    "reason", result.reason(),
+                    "entitlements", service.entitlementState(owner)
+            ));
+        }
+
+        service.assignPlan(owner, "PREMIUM");
+        return ResponseEntity.ok(Map.of(
+                "activated", true,
+                "store", result.store(),
+                "productId", result.productId(),
+                "transactionId", result.transactionId(),
+                "entitlements", service.entitlementState(owner)
+        ));
+    }
+
+    @PostMapping("/billing/{userId}/restore")
+    public ResponseEntity<?> restore(@PathVariable UUID userId, @RequestBody Map<String, Object> body) {
+        UUID owner = CurrentUser.requireSelfOrAdmin(userId);
+        String store = resolveStore(body);
+        String receipt = stringValue(body.get("receipt"), "");
+
+        ReceiptValidationService.ActivationResult result = receiptValidationService
+                .restorePurchases(owner, store, receipt);
+        if (!result.activated()) {
+            return ResponseEntity.ok(Map.of(
+                    "restored", false,
+                    "reason", result.reason(),
+                    "entitlements", service.entitlementState(owner)
+            ));
+        }
+
+        service.assignPlan(owner, "PREMIUM");
+        return ResponseEntity.ok(Map.of(
+                "restored", true,
+                "transactionId", result.transactionId(),
+                "entitlements", service.entitlementState(owner)
+        ));
+    }
+
     @PostMapping("/quotas/{userId}/consume")
     public ResponseEntity<?> consume(@PathVariable UUID userId, @RequestBody Map<String, String> body) {
         UUID owner = CurrentUser.requireSelfOrAdmin(userId);
         return ResponseEntity.ok(service.consumeQuota(owner, body.get("featureKey")));
+    }
+
+    private static String resolveStore(Map<String, Object> body) {
+        String platform = stringValue(body.get("platform"), "");
+        if (!platform.isBlank()) {
+            return platform;
+        }
+        return stringValue(body.get("store"), "app_store");
+    }
+
+    private static String stringValue(Object value, String defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        String text = String.valueOf(value);
+        return text.isBlank() ? defaultValue : text;
     }
 }

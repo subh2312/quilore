@@ -1,5 +1,6 @@
 """Application configuration via pydantic-settings."""
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,8 @@ class Settings(BaseSettings):
 
     # ─── Service ─────────────────────────────────────────────
     port: int = 8000
+    # Shared secret for privileged service-to-service routes (e.g. queue workers).
+    internal_api_token: str = Field(default="", validation_alias="AI_SERVICE_INTERNAL_TOKEN")
 
     # ─── Database (read-only access for RAG / embeddings) ────
     database_url: str = "postgresql://quilore:quilore_dev_pass@localhost:5432/quilore"
