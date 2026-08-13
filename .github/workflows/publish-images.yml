@@ -329,23 +329,51 @@ jobs:
       - name: Configure SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          cat >> ~/.ssh/config <<'CFG'
-          Host quilore-pi
-            HostName ssh.sm4devlabs.dpdns.org
-            User REPLACE_USER
-            IdentityFile ~/.ssh/id_ed25519
-            IdentitiesOnly yes
-            StrictHostKeyChecking accept-new
-            ProxyCommand cloudflared access ssh --hostname %h
-          CFG
-          sed -i "s/REPLACE_USER/${{ secrets.DEPLOY_USER }}/" ~/.ssh/config
-          # Allow override host via secret (default tunnel hostname)
-          if [ -n "${{ secrets.DEPLOY_HOST }}" ]; then
-            sed -i "s/HostName .*/HostName ${{ secrets.DEPLOY_HOST }}/" ~/.ssh/config
+          chmod 700 ~/.ssh
+
+          KEY_FILE="$HOME/.ssh/id_ed25519"
+          # Write private key; tolerate accidental literal \n from secret UI paste.
+          if [[ "$DEPLOY_SSH_KEY" == *$'\n'* ]]; then
+            printf '%s\n' "$DEPLOY_SSH_KEY" > "$KEY_FILE"
+          else
+            printf '%b\n' "$DEPLOY_SSH_KEY" > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
+
+          if ! ssh-keygen -y -f "$KEY_FILE" >/tmp/deploy_pubkey 2>/tmp/keyerr; then
+            echo "::error::DEPLOY_SSH_KEY is not a valid OpenSSH private key."
+            echo "Re-set it from the quilore-agent private file (include BEGIN/END lines):"
+            echo "  gh secret set DEPLOY_SSH_KEY < /path/to/quilore-agent"
+            cat /tmp/keyerr >&2 || true
+            exit 1
+          fi
+          echo "Deploy key fingerprint: $(ssh-keygen -lf "$KEY_FILE" | awk '{print $2}')"
+
+          # Avoid YAML-indent pollution in ssh_config by writing via printf.
+          {
+            echo "Host quilore-pi"
+            echo "  HostName ${DEPLOY_HOST}"
+            echo "  User ${DEPLOY_USER}"
+            echo "  IdentityFile ${KEY_FILE}"
+            echo "  IdentitiesOnly yes"
+            echo "  BatchMode yes"
+            echo "  StrictHostKeyChecking accept-new"
+            echo "  ProxyCommand cloudflared access ssh --hostname %h"
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+          echo "SSH config:" && cat ~/.ssh/config
+
+          echo "Testing SSH to Pi..."
+          if ! ssh quilore-pi 'echo SSH_OK; whoami; hostname'; then
+            echo "::error::SSH to Pi failed (Permission denied / key mismatch)."
+            echo "Ensure DEPLOY_SSH_KEY matches a line in ~${DEPLOY_USER}/.ssh/authorized_keys on the Pi."
+            echo "Working key fingerprint on Pi should be SHA256:QhSIfj1dYPGhbCaRjjN2i9HTXXsRjsLcMGQST9fFyD0 (cursor-cloud-agent)."
+            exit 1
           fi
 
       - name: Resolve deploy flags & image pins
