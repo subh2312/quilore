@@ -4,9 +4,9 @@
 - **Tool:** cursor
 - **Branch:** cursor-eas-observe-b3f3
 - **PR:** https://github.com/subh2312/quilore/pull/14
-- **What:** Wired EAS Observe; fixed Android EAS preview Bundle JS failure (WatermelonDB decorators + Babel).
-- **Why:** Build `194eae70…` failed on Bundle JavaScript: `Definitely assigned fields cannot be initialized here` in `lib/offline/models.ts`.
-- **How:** Use TypeScript `declare` on WM model fields + `@babel/plugin-transform-flow-strip-types` with `allowDeclareFields`; verified with `npx expo export --platform android`.
+- **What:** EAS Observe + WatermelonDB Babel fix; EAS GitHub/Workflows for preview APK (`image: latest`, `client/.eas/workflows/*`, projectId, docs).
+- **Why:** Enable Observe metrics and unbreak EAS Bundle JS; connect Expo↔GitHub for label builds and automated preview APK on `dev` client changes.
+- **How:** ObserveRoot/markInteractive/expo-router integration; `declare` + flow-strip-types `allowDeclareFields`; workflows next to `eas.json` under `client/` (Expo base directory `client`).
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
