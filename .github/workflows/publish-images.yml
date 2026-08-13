@@ -417,8 +417,9 @@ jobs:
             git clone "https://github.com/${REPO}.git" .
           fi
           git remote set-url origin "https://github.com/${REPO}.git"
-          # Authenticate fetch without storing the token in the remote URL.
-          git -c "http.extraHeader=AUTHORIZATION: bearer ${GHCR_TOKEN}" fetch --prune origin
+          # Same auth shape as actions/checkout: Basic x-access-token (Bearer fails non-interactively).
+          AUTH_HDR="$(printf 'x-access-token:%s' "${GHCR_TOKEN}" | base64 -w0 2>/dev/null || printf 'x-access-token:%s' "${GHCR_TOKEN}" | base64 | tr -d '\n')"
+          git -c "http.extraHeader=AUTHORIZATION: basic ${AUTH_HDR}" fetch --prune origin
           git checkout -B dev origin/dev
           git reset --hard "${GIT_REF}"
 
