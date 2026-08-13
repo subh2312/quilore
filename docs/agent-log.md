@@ -4,9 +4,10 @@
 - **Tool:** cursor
 - **Branch:** cursor-fix-deploy-ssh-key-b3f3
 - **PR:** https://github.com/subh2312/quilore/pull/12
-- **What:** Pi deploy SSH step now validates `DEPLOY_SSH_KEY` and smoke-tests login; clearer failure when the GitHub secret doesn’t match Pi `authorized_keys`.
-- **Why:** After PR #11, cloudflared install succeeded but deploy failed with `Permission denied (publickey)` — tunnel OK, secret key mismatch/malformed paste.
-- **How:** Normalize literal `\n`, `ssh-keygen -y` gate, BatchMode SSH probe before deploy; instruct re-setting secret via `gh secret set DEPLOY_SSH_KEY < quilore-agent`.
+- **What:** Pi deploy: validate `DEPLOY_SSH_KEY` + SSH smoke test; fix git fetch auth to Basic `x-access-token` (Bearer was failing on the Pi).
+- **Why:** After key aligned, deploy still failed: `fatal: could not read Username for 'https://github.com'` during remote `git fetch`.
+- **How:** Match `actions/checkout` auth (`AUTHORIZATION: basic` base64 of `x-access-token:TOKEN`); keep SSH fingerprint gate from earlier in this PR.
+
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
