@@ -76,8 +76,9 @@ quilore:
     read-timeout-ms: 30000
     internal-api-token: ${AI_SERVICE_INTERNAL_TOKEN:}
   billing:
-    # Staging/prod MUST leave false — mock receipts bypass store verification for UAT only.
-    allow-mock-receipts: ${QUILORE_ALLOW_MOCK_RECEIPTS:false}
+    # Dev/UAT default true so client mock IAP works without App Store secrets.
+    # Staging/prod MUST set QUILORE_ALLOW_MOCK_RECEIPTS=false.
+    allow-mock-receipts: ${QUILORE_ALLOW_MOCK_RECEIPTS:true}
     mock-receipt-token: ${QUILORE_MOCK_RECEIPT_TOKEN:UAT_MOCK_RECEIPT}
     apple-shared-secret: ${APPLE_SHARED_SECRET:}
     google-play-package-name: ${GOOGLE_PLAY_PACKAGE_NAME:}

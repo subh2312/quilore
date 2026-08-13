@@ -2,6 +2,54 @@
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Fix Client ESLint (`--max-warnings 0`) and AI Service ruff E501 so CI Lint & Build passes.
+- **Why:** Workout `setState` in effect, unused imports/`Array<T>`/`require()`, and two over-long program-generation strings failed CI.
+- **How:** Derive signed-out prefs copy from `user`; ESM test imports; `T[]` types; wrap `job_queue.py` prompt/programText lines.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Fix billing hang / logout auth errors / invisible dark-mode text; expand onboarding with physique photos+tags, goal physique, health/pain; triage uses recent workouts and can modify today’s routine; generation reads physique/health + avoidRegions.
+- **Why:** Premium stuck on Processing; “Authentication required” under Logout and broken re-login; screenshots showed unreadable text; users need physique/health inputs to drive plans; arm pain after legs must not look like DOMS.
+- **How:** Mock billing timeout + soft PREMIUM; themed login/logout (`textOnInverse`); always `clearStoredSession` on signOut; theme welcome/SessionSummary/PortionRange/admin/consent step; new onboarding screens; `triageContext` + muscle-map modify CTA; prefs/schedulePrefs persistence.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Design-system execution: WCAG-safer primary/danger colors; real light/dark `themes` + `useThemeColors` across tabs/onboarding/shared UI; keyboard/scroll-safe onboarding; profile-baseline no longer advances on hard save failure; consent Back; 48px chips/units; reduced-motion; Quilore not-found/modal; scrubbed “Spring Boot” / causalClaim microcopy.
+- **Why:** Audit found tokens unused, broken dark mode, contrast fails, onboarding save bug, missing back on consent, sub-44px unit chips.
+- **How:** `themes.light/dark`, `useTheme`/`SelectionChip`, re-enable `userInterfaceStyle: automatic`, fix baseline `finally` navigation, theme wired screens/components, contrast Jest checks.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Preference-based routine generation as Workout primary path; PDF/photo/voice/manual as manage tools. Nutrition modes: manual / meal photo / label / packaged with AI macro calc. Profile days/week drives generation.
+- **Why:** User clarified workouts/routines must come from preferences; capture methods are add/update paths. Same model for nutrition logging.
+- **How:** `generateProgramFromPreferences` + Coach program prefs payload + Spring structured draft; Workout hero CTA; Nutrition capture mode grid; confirm → `calculateMeal`.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Ensure Coach Chat always returns a visible reply (meal-aware local fallback; never silent on 401/quota/offline); degraded AI envelopes include `content.reply`.
+- **Why:** Screenshots showed user messages with only a fake confirmation card — no coach bubble when AI/backend failed.
+- **How:** `sendCoachChat` catches all errors into `localCoachFallback`; unwrap replaces empty/unavailable envelopes; Spring `degradedUnavailable` now embeds a draft reply from the prompt.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** UX feedback fixes — remove hardcoded dalma meal cards; meal/label scan entry points; keyboard avoiding; voice set parser; PDF import clarity; semantic text colors + light UI; visual muscle map; goal→macro recalculation.
+- **Why:** Mobile screenshots showed demo Indian dishes everywhere, missing scan CTAs, keyboard covering inputs, broken voice parse, unclear “Pick PDF”, inconsistent contrast, text-only body triage, and macros ignoring goal changes.
+- **How:** Parse chat meal logs into confirmation cards; DocumentPicker scan meal/label on Nutrition; KAV on chat/onboarding/workout/nutrition; `parseVoiceSet` for “three by eight”; rename PDF import; force light UI + semantic tokens; silhouette muscle map; client+Spring map `fat_loss`/`muscle_gain` → deficit/surplus and recalculate on goal save.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
 - **Branch:** cursor-eas-observe-b3f3
 - **PR:** https://github.com/subh2312/quilore/pull/14
 - **What:** EAS Observe + WatermelonDB Babel fix; EAS GitHub/Workflows for preview APK (`image: latest`, `client/.eas/workflows/*`, projectId, docs).

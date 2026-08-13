@@ -1,11 +1,13 @@
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { QuiloreLogo } from '@/components/quilore/QuiloreLogo';
-import { palette, spacing } from '@/constants/DesignTokens';
+import { spacing } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 
 export function AuthScreenLayout({ children }: { children: React.ReactNode }) {
+  const c = useThemeColors();
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.surfaceMuted }]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -24,7 +26,7 @@ export function AuthScreenLayout({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: palette.gray50 },
+  safe: { flex: 1 },
   flex: { flex: 1 },
   scroll: {
     flexGrow: 1,

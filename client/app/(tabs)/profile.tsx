@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,8 +12,11 @@ import {
   View,
 } from 'react-native';
 import { Link, router } from 'expo-router';
-import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { SelectionChip } from '@/components/quilore/SelectionChip';
+import { radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 import { fetchMe, isSupportOrAdmin } from '@/lib/api/auth';
+import { ApiClientError } from '@/lib/api/client';
 import { fetchEntitlements, mockPurchase, mockRestorePurchases } from '@/lib/api/billing';
 import { setAnalyticsConsent, track } from '@/lib/analytics';
 import { setCrashReportingEnabled } from '@/lib/crashReporting';
@@ -22,6 +27,7 @@ import {
   upsertProfile,
   type ProfileUpsertInput,
 } from '@/lib/api/profile';
+import { recalculateMacroTargets } from '@/lib/nutrition/macroTargets';
 import { useAuth } from '@/context/AuthContext';
 
 const GOALS = ['fat_loss', 'recomp', 'muscle_gain', 'maintain', 'performance'] as const;
@@ -31,6 +37,7 @@ const TONES = ['direct', 'supportive', 'detailed'] as const;
 const SECONDARY = ['strength', 'mobility', 'endurance', 'nutrition_focus'] as const;
 
 export default function ProfileScreen() {
+  const c = useThemeColors();
   const { user, signOut } = useAuth();
   const [profileLoading, setProfileLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,6 +54,7 @@ export default function ProfileScreen() {
   const [injuriesDisclaimer, setInjuriesDisclaimer] = useState('');
 
   const [primaryGoal, setPrimaryGoal] = useState<(typeof GOALS)[number]>('recomp');
+  const [daysPerWeek, setDaysPerWeek] = useState('4');
   const [coachingTone, setCoachingTone] = useState<(typeof TONES)[number]>('supportive');
   const [secondaryPrefs, setSecondaryPrefs] = useState<string[]>([]);
 
@@ -97,12 +105,21 @@ export default function ProfileScreen() {
         if (goal.primaryGoal && (GOALS as readonly string[]).includes(goal.primaryGoal)) {
           setPrimaryGoal(goal.primaryGoal as (typeof GOALS)[number]);
         }
+        if (goal.schedulePrefs && typeof goal.schedulePrefs.daysPerWeek === 'number') {
+          setDaysPerWeek(String(goal.schedulePrefs.daysPerWeek));
+        }
         if (goal.coachingTone && (TONES as readonly string[]).includes(goal.coachingTone)) {
           setCoachingTone(goal.coachingTone as (typeof TONES)[number]);
         }
         if (goal.secondaryPrefs?.length) setSecondaryPrefs(goal.secondaryPrefs);
       } catch (err) {
-        if (active) setStatus(err instanceof Error ? err.message : 'Could not load profile.');
+        if (active) {
+          if (err instanceof ApiClientError && err.status === 401) {
+            setStatus('Session expired — sign out and sign in again.');
+          } else {
+            setStatus(err instanceof Error ? err.message : 'Could not load profile.');
+          }
+        }
       } finally {
         if (active) setProfileLoading(false);
       }
@@ -142,10 +159,20 @@ export default function ProfileScreen() {
         primaryGoal,
         coachingTone,
         secondaryPrefs,
-        schedulePrefs: { daysPerWeek: 4 },
+        schedulePrefs: { daysPerWeek: Math.min(6, Math.max(2, Number(daysPerWeek) || 4)) },
+      });
+      const macros = await recalculateMacroTargets(user.id, {
+        primaryGoal,
+        weightKg: payload.weightKg,
+        heightCm: payload.heightCm,
+        age: payload.age,
+        sex: payload.sex,
+        activityLevel: 'moderate',
       });
       track('goal_set', { primaryGoal, coachingTone, source: 'profile' });
-      setStatus('Profile and coaching preferences saved.');
+      setStatus(
+        `Profile saved. Macro targets updated for ${primaryGoal.replace('_', ' ')}: ${macros.targetCalories} kcal · P ${Math.round(macros.targetProteinG)}g / C ${Math.round(macros.targetCarbsG)}g / F ${Math.round(macros.targetFatG)}g.`,
+      );
     } catch (err) {
       setStatus(err instanceof Error ? err.message : 'Save failed — try again when online.');
     } finally {
@@ -155,13 +182,22 @@ export default function ProfileScreen() {
 
   async function purchase() {
     setBillingBusy(true);
+    setStatus(null);
     try {
       const ent = await mockPurchase('premium_monthly');
       setPlan(ent.plan === 'PREMIUM' ? 'PREMIUM' : 'FREE');
       track('subscription_started', { productId: 'premium_monthly' });
-      setStatus('Subscription activated via mock IAP (UAT receipt).');
+      setStatus(
+        ent.plan === 'PREMIUM'
+          ? 'Premium activated (UAT). You can change this anytime.'
+          : 'Purchase completed — plan unchanged.',
+      );
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'Purchase failed');
+      if (err instanceof ApiClientError && err.status === 401) {
+        setStatus('Session expired — sign in again to manage purchases.');
+      } else {
+        setStatus(err instanceof Error ? err.message : 'Purchase failed');
+      }
     } finally {
       setBillingBusy(false);
     }
@@ -169,13 +205,22 @@ export default function ProfileScreen() {
 
   async function restore() {
     setBillingBusy(true);
+    setStatus(null);
     try {
       const ent = await mockRestorePurchases();
       setPlan(ent.plan === 'PREMIUM' ? 'PREMIUM' : 'FREE');
       track('subscription_restored', { productId: 'premium_monthly' });
-      setStatus('Purchases restored.');
+      setStatus(
+        ent.plan === 'PREMIUM'
+          ? 'Purchases restored — Premium is active.'
+          : 'No Premium purchase found to restore.',
+      );
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'Restore failed');
+      if (err instanceof ApiClientError && err.status === 401) {
+        setStatus('Session expired — sign in again to restore purchases.');
+      } else {
+        setStatus(err instanceof Error ? err.message : 'Restore failed');
+      }
     } finally {
       setBillingBusy(false);
     }
@@ -188,139 +233,219 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <View style={styles.loading}>
-        <Text style={styles.loadingText}>Sign in to view your profile.</Text>
+      <View style={[styles.loading, { backgroundColor: c.surface }]}>
+        <Text style={[styles.loadingText, { color: c.textMuted }]}>Sign in to view your profile.</Text>
       </View>
     );
   }
 
   if (profileLoading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={palette.emerald} />
-        <Text style={styles.loadingText}>Loading profile…</Text>
+      <View style={[styles.loading, { backgroundColor: c.surface }]}>
+        <ActivityIndicator size="large" color={c.primary} />
+        <Text style={[styles.loadingText, { color: c.textMuted }]}>Loading profile…</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Profile</Text>
-      <Text style={styles.subtitle}>Account, baseline, goals, privacy, and billing</Text>
+    <KeyboardAvoidingView
+      style={[styles.root, { backgroundColor: c.surface }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={88}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag">
+        <Text style={[styles.title, { color: c.textPrimary }]}>Profile</Text>
+        <Text style={[styles.subtitle, { color: c.textMuted }]}>
+          Account, baseline, goals, privacy, and billing
+        </Text>
 
-      <View style={styles.card}>
-        <Text style={styles.section}>Account</Text>
-        <InfoRow label="Name" value={user.displayName || '—'} />
-        <InfoRow label="Email" value={user.email} />
-        <InfoRow label="User ID" value={user.id} />
-        <InfoRow label="Role" value={user.role} />
-        <InfoRow label="Plan" value={plan} />
-      </View>
+        <View style={[styles.card, { backgroundColor: c.surfaceMuted, borderColor: c.border }]}>
+          <Text style={[styles.section, { color: c.textPrimary }]}>Account</Text>
+          <InfoRow label="Name" value={user.displayName || '—'} />
+          <InfoRow label="Email" value={user.email} />
+          <InfoRow label="User ID" value={user.id} />
+          <InfoRow label="Role" value={user.role} />
+          <InfoRow label="Plan" value={plan} />
+        </View>
 
-      <Link href="/onboarding/welcome" style={styles.link}>
-        Re-run onboarding & preferences
-      </Link>
-      {canAdmin ? (
-        <Link href="/admin/food-aliases" style={styles.link}>
-          Admin · food alias review
+        <Link href="/onboarding/welcome" style={[styles.link, { color: c.textLink }]}>
+          Re-run onboarding & preferences
         </Link>
-      ) : null}
+        {canAdmin ? (
+          <Link href="/admin/food-aliases" style={[styles.link, { color: c.textLink }]}>
+            Admin · food alias review
+          </Link>
+        ) : null}
 
-      <Text style={styles.section}>Baseline (editable)</Text>
-      <Field label="Age" value={age} onChangeText={setAge} keyboardType="number-pad" />
-      <Text style={styles.label}>Sex</Text>
-      <ChipRow options={SEX_OPTIONS} value={sex} onChange={setSex} />
-      <Field label="Height (cm)" value={heightCm} onChangeText={setHeightCm} keyboardType="decimal-pad" />
-      <Field label="Weight (kg)" value={weightKg} onChangeText={setWeightKg} keyboardType="decimal-pad" />
-      <Text style={styles.label}>Training experience</Text>
-      <ChipRow options={EXPERIENCE} value={trainingExperience} onChange={setTrainingExperience} />
-      <Field
-        label="Dietary preferences"
-        value={dietaryPreferences}
-        onChangeText={setDietaryPreferences}
-        placeholder="e.g. vegetarian, high protein"
-      />
-      <Field
-        label="Injuries / limitations (risk flag only)"
-        value={injuriesInfo}
-        onChangeText={setInjuriesInfo}
-        placeholder="Optional — not a diagnosis"
-        multiline
-      />
-      {injuriesDisclaimer ? <Text style={styles.disclaimer}>{injuriesDisclaimer}</Text> : null}
-      <Field
-        label="Equipment access"
-        value={equipmentAccess}
-        onChangeText={setEquipmentAccess}
-        placeholder="e.g. home dumbbells, full gym"
-      />
+        <Text style={[styles.section, { color: c.textPrimary }]}>Baseline (editable)</Text>
+        <Field label="Age" value={age} onChangeText={setAge} keyboardType="number-pad" />
+        <Text style={[styles.label, { color: c.textPrimary }]}>Sex</Text>
+        <View style={styles.wrap}>
+          {SEX_OPTIONS.map((opt) => (
+            <SelectionChip
+              key={opt}
+              label={opt.replace('_', ' ')}
+              selected={sex === opt}
+              onPress={() => setSex(opt)}
+            />
+          ))}
+        </View>
+        <Field label="Height (cm)" value={heightCm} onChangeText={setHeightCm} keyboardType="decimal-pad" />
+        <Field label="Weight (kg)" value={weightKg} onChangeText={setWeightKg} keyboardType="decimal-pad" />
+        <Text style={[styles.label, { color: c.textPrimary }]}>Training experience</Text>
+        <View style={styles.wrap}>
+          {EXPERIENCE.map((opt) => (
+            <SelectionChip
+              key={opt}
+              label={opt.replace('_', ' ')}
+              selected={trainingExperience === opt}
+              onPress={() => setTrainingExperience(opt)}
+            />
+          ))}
+        </View>
+        <Field
+          label="Dietary preferences"
+          value={dietaryPreferences}
+          onChangeText={setDietaryPreferences}
+          placeholder="e.g. vegetarian, high protein"
+        />
+        <Field
+          label="Injuries / limitations (risk flag only)"
+          value={injuriesInfo}
+          onChangeText={setInjuriesInfo}
+          placeholder="Optional — not a diagnosis"
+          multiline
+        />
+        {injuriesDisclaimer ? (
+          <Text style={[styles.disclaimer, { color: c.textWarning }]}>{injuriesDisclaimer}</Text>
+        ) : null}
+        <Field
+          label="Equipment access"
+          value={equipmentAccess}
+          onChangeText={setEquipmentAccess}
+          placeholder="e.g. home dumbbells, full gym"
+        />
 
-      <Text style={styles.section}>Goals & coaching</Text>
-      <Text style={styles.label}>Primary goal</Text>
-      <ChipRow options={GOALS} value={primaryGoal} onChange={setPrimaryGoal} />
-      <Text style={styles.label}>Coaching tone</Text>
-      <ChipRow options={TONES} value={coachingTone} onChange={setCoachingTone} />
-      <Text style={styles.label}>Secondary preferences (optional)</Text>
-      <View style={styles.wrap}>
-        {SECONDARY.map((s) => (
-          <Pressable
-            key={s}
-            style={[styles.chip, secondaryPrefs.includes(s) && styles.chipOn]}
-            onPress={() => toggleSecondary(s)}>
-            <Text style={styles.chipText}>{s.replace('_', ' ')}</Text>
-          </Pressable>
-        ))}
-      </View>
+        <Text style={[styles.section, { color: c.textPrimary }]}>Goals & coaching</Text>
+        <Text style={[styles.label, { color: c.textPrimary }]}>Primary goal</Text>
+        <View style={styles.wrap}>
+          {GOALS.map((opt) => (
+            <SelectionChip
+              key={opt}
+              label={opt.replace('_', ' ')}
+              selected={primaryGoal === opt}
+              onPress={() => setPrimaryGoal(opt)}
+            />
+          ))}
+        </View>
+        <Field
+          label="Training days per week"
+          value={daysPerWeek}
+          onChangeText={setDaysPerWeek}
+          keyboardType="number-pad"
+          placeholder="2–6"
+        />
+        <Text style={[styles.label, { color: c.textPrimary }]}>Coaching tone</Text>
+        <View style={styles.wrap}>
+          {TONES.map((opt) => (
+            <SelectionChip
+              key={opt}
+              label={opt}
+              selected={coachingTone === opt}
+              onPress={() => setCoachingTone(opt)}
+            />
+          ))}
+        </View>
+        <Text style={[styles.label, { color: c.textPrimary }]}>Secondary preferences (optional)</Text>
+        <View style={styles.wrap}>
+          {SECONDARY.map((s) => (
+            <SelectionChip
+              key={s}
+              label={s.replace('_', ' ')}
+              selected={secondaryPrefs.includes(s)}
+              onPress={() => toggleSecondary(s)}
+            />
+          ))}
+        </View>
 
-      <Pressable
-        style={[styles.primary, (!baselineValid || saving) && styles.disabled]}
-        onPress={saveProfile}
-        disabled={!baselineValid || saving}>
-        <Text style={styles.primaryText}>{saving ? 'Saving…' : 'Save profile & coaching prefs'}</Text>
-      </Pressable>
+        <Pressable
+          style={[styles.primary, { backgroundColor: c.primary }, (!baselineValid || saving) && styles.disabled]}
+          onPress={saveProfile}
+          disabled={!baselineValid || saving}>
+          <Text style={[styles.primaryText, { color: c.textOnPrimary }]}>
+            {saving ? 'Saving…' : 'Save profile & coaching prefs'}
+          </Text>
+        </Pressable>
 
-      <Text style={styles.section}>Privacy preferences</Text>
-      <Row
-        label="Analytics opt-in"
-        value={analytics}
-        onChange={(v) => {
-          setAnalytics(v);
-          setAnalyticsConsent(v);
-        }}
-      />
-      <Row
-        label="Crash reporting"
-        value={crash}
-        onChange={(v) => {
-          setCrash(v);
-          setCrashReportingEnabled(v);
-        }}
-      />
-      <Row label="Privacy-safe notifications" value={privacyNotifs} onChange={setPrivacyNotifs} />
-      <Row label="Workout reminders" value={workoutReminders} onChange={setWorkoutReminders} />
+        <Text style={[styles.section, { color: c.textPrimary }]}>Privacy preferences</Text>
+        <Row
+          label="Analytics opt-in"
+          value={analytics}
+          onChange={(v) => {
+            setAnalytics(v);
+            setAnalyticsConsent(v);
+          }}
+        />
+        <Row
+          label="Crash reporting"
+          value={crash}
+          onChange={(v) => {
+            setCrash(v);
+            setCrashReportingEnabled(v);
+          }}
+        />
+        <Row label="Privacy-safe notifications" value={privacyNotifs} onChange={setPrivacyNotifs} />
+        <Row label="Workout reminders" value={workoutReminders} onChange={setWorkoutReminders} />
 
-      <Text style={styles.section}>Subscription · {plan}</Text>
-      <Pressable style={[styles.primary, billingBusy && styles.disabled]} onPress={purchase} disabled={billingBusy}>
-        <Text style={styles.primaryText}>{billingBusy ? 'Processing…' : 'Start Premium'}</Text>
-      </Pressable>
-      <Pressable style={styles.secondary} onPress={restore} disabled={billingBusy}>
-        <Text style={styles.secondaryText}>Restore purchases</Text>
-      </Pressable>
+        <Text style={[styles.section, { color: c.textPrimary }]}>Subscription · {plan}</Text>
+        <Pressable
+          style={[styles.primary, { backgroundColor: c.primary }, billingBusy && styles.disabled]}
+          onPress={purchase}
+          disabled={billingBusy}>
+          <Text style={[styles.primaryText, { color: c.textOnPrimary }]}>
+            {billingBusy ? 'Processing…' : 'Start Premium'}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.secondary, { borderColor: c.primary }]}
+          onPress={restore}
+          disabled={billingBusy}>
+          <Text style={[styles.secondaryText, { color: c.textSuccess }]}>Restore purchases</Text>
+        </Pressable>
 
-      <Pressable style={styles.logout} onPress={handleLogout} accessibilityRole="button">
-        <Text style={styles.logoutText}>Log out</Text>
-      </Pressable>
+        <Pressable
+          style={[styles.logout, { backgroundColor: c.surfaceInverse }]}
+          onPress={handleLogout}
+          accessibilityRole="button">
+          <Text style={[styles.logoutText, { color: c.textOnInverse }]}>Log out</Text>
+        </Pressable>
 
-      {status ? <Text style={styles.status}>{status}</Text> : null}
-    </ScrollView>
+        {status ? (
+          <Text
+            style={[
+              styles.status,
+              {
+                color:
+                  /expired|failed|could not|error/i.test(status) ? c.textDanger : c.textSecondary,
+              },
+            ]}>
+            {status}
+          </Text>
+        ) : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
+  const c = useThemeColors();
   return (
     <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+      <Text style={[styles.infoLabel, { color: c.textMuted }]}>{label}</Text>
+      <Text style={[styles.infoValue, { color: c.textPrimary }]}>{value}</Text>
     </View>
   );
 }
@@ -340,41 +465,23 @@ function Field({
   placeholder?: string;
   multiline?: boolean;
 }) {
+  const c = useThemeColors();
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: c.textPrimary }]}>{label}</Text>
       <TextInput
-        style={[styles.input, multiline && styles.multiline]}
+        style={[
+          styles.input,
+          multiline && styles.multiline,
+          { borderColor: c.border, backgroundColor: c.inputBg, color: c.inputText },
+        ]}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType}
         placeholder={placeholder}
-        placeholderTextColor={palette.gray400}
+        placeholderTextColor={c.inputPlaceholder}
         multiline={multiline}
       />
-    </View>
-  );
-}
-
-function ChipRow<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: readonly T[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <View style={styles.wrap}>
-      {options.map((opt) => (
-        <Pressable
-          key={opt}
-          style={[styles.chip, value === opt && styles.chipOn]}
-          onPress={() => onChange(opt)}>
-          <Text style={styles.chipText}>{opt.replace('_', ' ')}</Text>
-        </Pressable>
-      ))}
     </View>
   );
 }
@@ -388,85 +495,70 @@ function Row({
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const c = useThemeColors();
   return (
     <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={[styles.rowLabel, { color: c.textPrimary }]}>{label}</Text>
       <Switch value={value} onValueChange={onChange} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   container: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
-  loadingText: { color: palette.gray600, fontSize: typography.fontSize.md },
-  title: { fontSize: typography.fontSize.xl, fontWeight: '700', color: palette.gray900 },
-  subtitle: { fontSize: typography.fontSize.sm, color: palette.gray500 },
+  loadingText: { fontSize: typography.fontSize.md },
+  title: { fontSize: typography.fontSize.xl, fontWeight: '700' },
+  subtitle: { fontSize: typography.fontSize.sm },
   card: {
-    backgroundColor: palette.gray50,
     borderRadius: radii.lg,
     padding: spacing.md,
     gap: spacing.xs,
     borderWidth: 1,
-    borderColor: palette.gray200,
   },
-  link: { color: palette.blue, fontWeight: '600' },
-  section: { fontWeight: '700', color: palette.gray800, marginTop: spacing.sm },
-  label: { fontWeight: '700', color: palette.gray800 },
+  link: { fontWeight: '600' },
+  section: { fontWeight: '700', marginTop: spacing.sm },
+  label: { fontWeight: '700' },
   field: { gap: spacing.xs },
   input: {
     minHeight: touchTarget.minHeight,
     borderWidth: 1,
-    borderColor: palette.gray300,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
-    backgroundColor: palette.white,
     fontSize: typography.fontSize.md,
-    color: palette.gray900,
   },
   multiline: { minHeight: 88, paddingTop: spacing.sm, textAlignVertical: 'top' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: {
-    minHeight: touchTarget.minHeight,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.full,
-    backgroundColor: palette.gray200,
-    justifyContent: 'center',
-  },
-  chipOn: { backgroundColor: palette.emeraldLight },
-  chipText: { fontWeight: '700', color: palette.gray800, textTransform: 'capitalize' },
-  disclaimer: { color: palette.amber, fontSize: typography.fontSize.sm, fontWeight: '600' },
+  disclaimer: { fontSize: typography.fontSize.sm, fontWeight: '600' },
   primary: {
     minHeight: touchTarget.minHeight,
-    backgroundColor: palette.emerald,
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: { color: palette.white, fontWeight: '700' },
+  primaryText: { fontWeight: '700' },
   secondary: {
     minHeight: touchTarget.minHeight,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: palette.emerald,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryText: { color: palette.emeraldDark, fontWeight: '700' },
+  secondaryText: { fontWeight: '700' },
   logout: {
     minHeight: touchTarget.minHeight,
     borderRadius: radii.md,
-    backgroundColor: palette.gray800,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.sm,
   },
-  logoutText: { color: palette.white, fontWeight: '800' },
+  logoutText: { fontWeight: '800' },
   disabled: { opacity: 0.6 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  rowLabel: { color: palette.gray800, fontSize: typography.fontSize.md },
+  rowLabel: { fontSize: typography.fontSize.md },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.xs },
-  infoLabel: { color: palette.gray500, fontSize: typography.fontSize.sm, flex: 1 },
-  infoValue: { color: palette.gray900, fontSize: typography.fontSize.sm, fontWeight: '600', flex: 2, textAlign: 'right' },
-  status: { color: palette.gray700, fontSize: typography.fontSize.sm },
+  infoLabel: { fontSize: typography.fontSize.sm, flex: 1 },
+  infoValue: { fontSize: typography.fontSize.sm, fontWeight: '600', flex: 2, textAlign: 'right' },
+  status: { fontSize: typography.fontSize.sm },
 });

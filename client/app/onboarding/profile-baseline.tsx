@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { OnboardingStepLayout } from '@/components/quilore/OnboardingStepLayout';
-import { palette, radii, spacing, touchTarget, typography } from '@/constants/DesignTokens';
+import { SelectionChip } from '@/components/quilore/SelectionChip';
+import { radii, spacing, touchTarget, typography } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 import { upsertProfile } from '@/lib/api/profile';
+import { ApiClientError } from '@/lib/api/client';
 import { getOnboardingDraft, saveOnboardingDraft } from '@/lib/onboarding/storage';
 import { useAuth } from '@/context/AuthContext';
 
@@ -12,6 +15,7 @@ const EXPERIENCE = ['beginner', 'intermediate', 'advanced'] as const;
 
 export default function ProfileBaselineScreen() {
   const { user } = useAuth();
+  const c = useThemeColors();
   const [age, setAge] = useState('');
   const [sex, setSex] = useState<(typeof SEX_OPTIONS)[number]>('female');
   const [heightCm, setHeightCm] = useState('');
@@ -47,7 +51,7 @@ export default function ProfileBaselineScreen() {
     Number(weightKg) > 0;
 
   async function next() {
-    if (!valid || !user) return;
+    if (!valid || !user || busy) return;
     setBusy(true);
     setError(null);
     const payload = {
@@ -63,11 +67,19 @@ export default function ProfileBaselineScreen() {
     await saveOnboardingDraft(user.id, payload);
     try {
       await upsertProfile(user.id, payload);
+      router.push('/onboarding/physique-current');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Saved locally — sync when online.');
+      // Offline / unavailable: keep draft and continue. Hard failures stay on this step.
+      const offline =
+        err instanceof ApiClientError && (err.endpointUnavailable || err.status === 0);
+      if (offline) {
+        setError('Saved on this device — will sync when you are back online.');
+        router.push('/onboarding/physique-current');
+      } else {
+        setError(err instanceof Error ? err.message : 'Could not save baseline. Check your connection and try again.');
+      }
     } finally {
       setBusy(false);
-      router.push('/onboarding/goals');
     }
   }
 
@@ -76,18 +88,31 @@ export default function ProfileBaselineScreen() {
       title="Your baseline"
       subtitle="Coaching estimates use these inputs — you can update them anytime in Profile."
       step={3}
-      totalSteps={4}
+      totalSteps={7}
       onBack={() => router.back()}
       onNext={next}
       nextDisabled={!valid || busy}
       nextLabel={busy ? 'Saving…' : 'Continue'}>
       <Field label="Age" value={age} onChangeText={setAge} keyboardType="number-pad" />
-      <Text style={styles.label}>Sex</Text>
-      <ChipRow options={SEX_OPTIONS} value={sex} onChange={setSex} />
+      <Text style={[styles.label, { color: c.textPrimary }]}>Sex</Text>
+      <View style={styles.wrap}>
+        {SEX_OPTIONS.map((opt) => (
+          <SelectionChip key={opt} label={opt} selected={sex === opt} onPress={() => setSex(opt)} />
+        ))}
+      </View>
       <Field label="Height (cm)" value={heightCm} onChangeText={setHeightCm} keyboardType="decimal-pad" />
       <Field label="Weight (kg)" value={weightKg} onChangeText={setWeightKg} keyboardType="decimal-pad" />
-      <Text style={styles.label}>Training experience</Text>
-      <ChipRow options={EXPERIENCE} value={trainingExperience} onChange={setTrainingExperience} />
+      <Text style={[styles.label, { color: c.textPrimary }]}>Training experience</Text>
+      <View style={styles.wrap}>
+        {EXPERIENCE.map((opt) => (
+          <SelectionChip
+            key={opt}
+            label={opt}
+            selected={trainingExperience === opt}
+            onPress={() => setTrainingExperience(opt)}
+          />
+        ))}
+      </View>
       <Field
         label="Dietary preferences"
         value={dietaryPreferences}
@@ -101,14 +126,16 @@ export default function ProfileBaselineScreen() {
         placeholder="Optional — not a diagnosis"
         multiline
       />
-      <Text style={styles.disclaimer}>Injury notes are risk flags for coaching — not medical diagnoses.</Text>
+      <Text style={[styles.disclaimer, { color: c.textWarning }]}>
+        Injury notes are risk flags for coaching — not medical diagnoses.
+      </Text>
       <Field
         label="Equipment access"
         value={equipmentAccess}
         onChangeText={setEquipmentAccess}
         placeholder="e.g. home dumbbells, full gym"
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: c.textDanger }]}>{error}</Text> : null}
     </OnboardingStepLayout>
   );
 }
@@ -128,69 +155,43 @@ function Field({
   placeholder?: string;
   multiline?: boolean;
 }) {
+  const c = useThemeColors();
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: c.textPrimary }]}>{label}</Text>
       <TextInput
-        style={[styles.input, multiline && styles.multiline]}
+        style={[
+          styles.input,
+          {
+            borderColor: c.border,
+            backgroundColor: c.inputBg,
+            color: c.inputText,
+          },
+          multiline && styles.multiline,
+        ]}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType}
         placeholder={placeholder}
-        placeholderTextColor={palette.gray400}
+        placeholderTextColor={c.inputPlaceholder}
         multiline={multiline}
       />
     </View>
   );
 }
 
-function ChipRow<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: readonly T[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <View style={styles.wrap}>
-      {options.map((opt) => (
-        <Pressable
-          key={opt}
-          style={[styles.chip, value === opt && styles.chipOn]}
-          onPress={() => onChange(opt)}>
-          <Text style={styles.chipText}>{opt.replace('_', ' ')}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   field: { gap: spacing.xs },
-  label: { fontWeight: '700', color: palette.gray800 },
+  label: { fontWeight: '700' },
   input: {
     minHeight: touchTarget.minHeight,
     borderWidth: 1,
-    borderColor: palette.gray300,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
-    backgroundColor: palette.gray50,
     fontSize: typography.fontSize.md,
-    color: palette.gray900,
   },
   multiline: { minHeight: 88, paddingTop: spacing.sm, textAlignVertical: 'top' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: {
-    minHeight: touchTarget.minHeight,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.full,
-    backgroundColor: palette.gray200,
-    justifyContent: 'center',
-  },
-  chipOn: { backgroundColor: palette.emeraldLight },
-  chipText: { fontWeight: '700', color: palette.gray800, textTransform: 'capitalize' },
-  disclaimer: { color: palette.amber, fontSize: typography.fontSize.sm, fontWeight: '600' },
-  error: { color: palette.red, fontWeight: '600' },
+  disclaimer: { fontSize: typography.fontSize.sm, fontWeight: '600' },
+  error: { fontWeight: '600' },
 });

@@ -44,6 +44,16 @@ export type OnboardingDraft = {
   primaryGoal?: string;
   coachingTone?: string;
   consentsAccepted?: boolean;
+  /** Current physique tags (e.g. lean, soft, athletic). */
+  currentPhysique?: string[];
+  /** Desired physique tags. */
+  goalPhysique?: string[];
+  /** Optional local photo URIs for current physique. */
+  physiquePhotoUris?: string[];
+  /** Pre-existing conditions (diabetes, hypertension, …). */
+  healthConditions?: string[];
+  /** Current pain / limitation regions. */
+  painRegions?: string[];
 };
 
 /** Required consent captured offline; must be flushed when Spring Boot is reachable. */

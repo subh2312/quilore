@@ -47,7 +47,7 @@ public class MacroTargetService {
     @Transactional
     public TargetSnapshot calculate(UUID userId, String goalType, double weightKg, double heightCm,
                                     int age, String sex, String activityLevel) {
-        Policy policy = policies.getOrDefault(goalType, policies.get("maintain"));
+        Policy policy = policies.getOrDefault(normalizeGoalType(goalType), policies.get("maintain"));
         double bmr = mifflin(weightKg, heightCm, age, sex);
         double tdee = bmr * activityFactor(activityLevel);
         int calories = (int) Math.round(tdee * (1.0 + policy.calorieDeltaFraction()));
@@ -81,6 +81,24 @@ public class MacroTargetService {
 
     public Map<String, Policy> policies() {
         return policies;
+    }
+
+    /** Map product goal keys (fat_loss, muscle_gain, …) onto macro policy vocabulary. */
+    public static String normalizeGoalType(String goalType) {
+        if (goalType == null || goalType.isBlank()) {
+            return "maintain";
+        }
+        String key = goalType.trim().toLowerCase();
+        return switch (key) {
+            case "fat_loss", "deficit", "cut" -> "deficit";
+            case "muscle_gain", "surplus", "bulk" -> "surplus";
+            case "recomp", "maintain", "performance", "maintenance" -> "maintain";
+            default -> policiesContains(key) ? key : "maintain";
+        };
+    }
+
+    private static boolean policiesContains(String key) {
+        return key.equals("maintain") || key.equals("deficit") || key.equals("surplus");
     }
 
     private TargetSnapshot toSnapshot(MacroTargetSnapshotEntity entity) {

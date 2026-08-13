@@ -140,18 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (refreshToken) {
         await apiLogout(refreshToken);
-      } else {
-        const current = await getStoredRefreshToken();
-        if (!current) {
-          await clearStoredSession();
-        }
       }
     } catch {
-      const current = await getStoredRefreshToken();
-      if (!refreshToken || current === refreshToken) {
-        await clearStoredSession();
-      }
+      // Best-effort server revoke — always clear local session below.
     }
+    await clearStoredSession();
     if (userId) {
       await clearOnboardingCompleteLocal(userId);
     }

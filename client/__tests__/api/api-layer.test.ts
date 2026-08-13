@@ -222,6 +222,40 @@ describe("Coach chat fallback", () => {
     expect(res.message).toContain("quota exceeded");
     expect(res.reply.toLowerCase()).toContain("superset");
   });
+
+  it("still replies for meal logs when auth fails (never silent)", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      headers: { get: () => "application/json" },
+      json: async () => ({ message: "Unauthorized" }),
+    });
+
+    const res = await sendCoachChat({ message: "Log paratha and alu bhaji for breakfast" });
+
+    expect(res.degraded).toBe(true);
+    expect(res.reply.toLowerCase()).toContain("paratha");
+    expect(res.reply.toLowerCase()).toContain("alu bhaji");
+  });
+
+  it("uses local draft when envelope has no reply content", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        envelope: {
+          degraded: true,
+          message: "AI service unavailable — ConnectException",
+          content: { status: "unavailable" },
+        },
+      }),
+    });
+
+    const res = await sendCoachChat({ message: "Log dalma for lunch" });
+    expect(res.reply.toLowerCase()).toContain("dalma");
+    expect(res.degraded).toBe(true);
+  });
 });
 
 describe("Nutrition and workout Spring Boot endpoints", () => {

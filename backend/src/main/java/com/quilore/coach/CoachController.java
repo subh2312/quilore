@@ -66,10 +66,15 @@ public class CoachController {
         if (limited != null) {
             return limited;
         }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> preferences = body.get("preferences") instanceof Map<?, ?> raw
+                ? (Map<String, Object>) raw
+                : Map.of();
         return ResponseEntity.ok(coachService.generateProgram(
                 userId,
-                String.valueOf(body.getOrDefault("prompt", "Generate a program")),
-                body.get("idempotencyKey") == null ? null : String.valueOf(body.get("idempotencyKey"))));
+                String.valueOf(body.getOrDefault("prompt", "Generate a program from my preferences")),
+                body.get("idempotencyKey") == null ? null : String.valueOf(body.get("idempotencyKey")),
+                preferences));
     }
 
     private ResponseEntity<Map<String, Object>> consumeQuotaOr429(UUID userId, String task) {

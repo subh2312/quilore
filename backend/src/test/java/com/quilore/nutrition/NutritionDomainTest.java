@@ -32,6 +32,19 @@ class NutritionDomainTest {
     }
 
     @Test
+    void productGoalKeysMapOntoMacroPolicies() {
+        UUID userId = UUID.randomUUID();
+        var fatLoss = macroTargetService.calculate(userId, "fat_loss", 90, 174, 33, "male", "moderate");
+        var muscle = macroTargetService.calculate(userId, "muscle_gain", 90, 174, 33, "male", "moderate");
+        var recomp = macroTargetService.calculate(userId, "recomp", 90, 174, 33, "male", "moderate");
+        assertThat(fatLoss.goalType()).isEqualTo("deficit");
+        assertThat(muscle.goalType()).isEqualTo("surplus");
+        assertThat(recomp.goalType()).isEqualTo("maintain");
+        assertThat(fatLoss.targetCalories()).isLessThan(recomp.targetCalories());
+        assertThat(muscle.targetCalories()).isGreaterThan(recomp.targetCalories());
+    }
+
+    @Test
     void icmrTargetsAdjustForSexAndPregnancy() {
         var female = icmrRdaService.targetsFor(new IcmrRdaService.ProfileInput(30, "female", false, false));
         var pregnant = icmrRdaService.targetsFor(new IcmrRdaService.ProfileInput(30, "female", true, false));

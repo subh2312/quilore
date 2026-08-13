@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import { palette, radii, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { radii, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { useThemeColors } from "@/hooks/useTheme";
 import { runOnDeviceOcr } from "@/lib/ocr/onDeviceOcr";
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function PdfImportPanel({ onImported }: Props) {
+  const c = useThemeColors();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
@@ -20,11 +22,15 @@ export function PdfImportPanel({ onImported }: Props) {
     setBusy(true);
     setNote(null);
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/*"],
+        copyToCacheDirectory: true,
+      });
       if (result.canceled) return;
       const asset = result.assets?.[0];
       const uri = asset?.uri ?? "file://workout.pdf";
-      setNote(asset?.name ? `Imported ${asset.name} — OCR draft (editable).` : "PDF selected — OCR draft.");
+      const kind = asset?.mimeType?.includes("pdf") || asset?.name?.toLowerCase().endsWith(".pdf") ? "PDF" : "photo";
+      setNote(asset?.name ? `Imported ${asset.name} (${kind}) — OCR draft (editable).` : `${kind} selected — OCR draft.`);
       const ocr = await runOnDeviceOcr(uri);
       const exercises =
         ocr.mappedExercises ??
@@ -42,25 +48,36 @@ export function PdfImportPanel({ onImported }: Props) {
 
   return (
     <View style={styles.box}>
-      <Text style={styles.label}>Import workout PDF / photo</Text>
-      <Pressable style={styles.btn} onPress={pickPdf} disabled={busy}>
-        {busy ? <ActivityIndicator color={palette.white} /> : <Text style={styles.btnText}>Pick PDF</Text>}
+      <Text style={[styles.label, { color: c.textPrimary }]}>Import workout PDF or photo</Text>
+      <Text style={[styles.hint, { color: c.textMuted }]}>
+        Choose a program PDF or a photo of a written plan — OCR drafts stay editable.
+      </Text>
+      <Pressable
+        style={[styles.btn, { backgroundColor: c.primary }]}
+        onPress={pickPdf}
+        disabled={busy}
+        accessibilityLabel="Import workout PDF or photo">
+        {busy ? (
+          <ActivityIndicator color={c.textOnPrimary} />
+        ) : (
+          <Text style={[styles.btnText, { color: c.textOnPrimary }]}>Import PDF / photo</Text>
+        )}
       </Pressable>
-      {note ? <Text style={styles.note}>{note}</Text> : null}
+      {note ? <Text style={[styles.note, { color: c.textSecondary }]}>{note}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   box: { gap: spacing.sm },
-  label: { fontWeight: "700", color: palette.gray800 },
+  label: { fontWeight: "700", fontSize: typography.fontSize.md },
+  hint: { fontSize: typography.fontSize.sm },
   btn: {
     minHeight: touchTarget.minHeight,
-    backgroundColor: palette.emerald,
     borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { color: palette.white, fontWeight: "700" },
-  note: { fontSize: typography.fontSize.sm, color: palette.gray600 },
+  btnText: { fontWeight: "700" },
+  note: { fontSize: typography.fontSize.sm },
 });
