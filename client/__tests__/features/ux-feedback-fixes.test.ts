@@ -34,6 +34,15 @@ describe('Meal log parsing', () => {
   });
 });
 
+describe('Coach always replies', () => {
+  it('local fallback acknowledges meal log contents', () => {
+    const { localCoachFallback } = require('../../lib/api/coach') as typeof import('../../lib/api/coach');
+    const res = localCoachFallback('Log paratha and alu bhaji for breakfast');
+    expect(res.reply.toLowerCase()).toContain('paratha');
+    expect(res.reply.length).toBeGreaterThan(20);
+  });
+});
+
 describe('Goal to macro targets', () => {
   it('maps product goals and changes calories with goal', () => {
     expect(mapGoalToMacroPolicy('fat_loss')).toBe('deficit');

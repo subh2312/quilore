@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor-ux-feedback-fixes-1811
 - **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Ensure Coach Chat always returns a visible reply (meal-aware local fallback; never silent on 401/quota/offline); degraded AI envelopes include `content.reply`.
+- **Why:** Screenshots showed user messages with only a fake confirmation card — no coach bubble when AI/backend failed.
+- **How:** `sendCoachChat` catches all errors into `localCoachFallback`; unwrap replaces empty/unavailable envelopes; Spring `degradedUnavailable` now embeds a draft reply from the prompt.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
 - **What:** UX feedback fixes — remove hardcoded dalma meal cards; meal/label scan entry points; keyboard avoiding; voice set parser; PDF import clarity; semantic text colors + light UI; visual muscle map; goal→macro recalculation.
 - **Why:** Mobile screenshots showed demo Indian dishes everywhere, missing scan CTAs, keyboard covering inputs, broken voice parse, unclear “Pick PDF”, inconsistent contrast, text-only body triage, and macros ignoring goal changes.
 - **How:** Parse chat meal logs into confirmation cards; DocumentPicker scan meal/label on Nutrition; KAV on chat/onboarding/workout/nutrition; `parseVoiceSet` for “three by eight”; rename PDF import; force light UI + semantic tokens; silhouette muscle map; client+Spring map `fat_loss`/`muscle_gain` → deficit/surplus and recalculate on goal save.

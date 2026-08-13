@@ -54,7 +54,8 @@ public class AiGatewayClient {
     }
 
     public Map<String, Object> invokeTask(String task, Map<String, Object> input) {
-        Map<String, Object> body = Map.of("input", input == null ? Map.of() : input);
+        Map<String, Object> safeInput = input == null ? Map.of() : input;
+        Map<String, Object> body = Map.of("input", safeInput);
         try {
             Map<String, Object> envelope = restClient.post()
                     .uri("/ai/tasks/{task}/invoke", task)
@@ -64,7 +65,9 @@ public class AiGatewayClient {
                     .body(new ParameterizedTypeReference<Map<String, Object>>() {});
             return validator.validate(envelope);
         } catch (Exception ex) {
-            return validator.degradedUnavailable(task, ex.getClass().getSimpleName());
+            String prompt = String.valueOf(safeInput.getOrDefault("prompt",
+                    safeInput.getOrDefault("message", "")));
+            return validator.degradedUnavailable(task, ex.getClass().getSimpleName(), prompt);
         }
     }
 

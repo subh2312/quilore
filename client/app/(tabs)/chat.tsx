@@ -23,57 +23,58 @@ export default function ChatScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([
     {
       id: "1",
       role: "coach",
       ai: true,
-      text: "Ask for supersets, plan tweaks, or log a meal (e.g. “Log paratha and alu bhaji for breakfast”). Suggestions stay editable.",
+      text: "Ask for supersets, plan tweaks, or log a meal (e.g. “Log paratha and alu bhaji for breakfast”). I’ll reply with an editable draft.",
     },
   ]);
   const [foodItems, setFoodItems] = useState<ConfirmItem[]>([]);
   const [foodPrompt, setFoodPrompt] = useState<string | null>(null);
   const coachingOn = isFlagEnabled(DEFAULT_FLAGS, "advanced_coaching");
 
+  function scrollToEnd() {
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+  }
+
   async function send() {
     if (!input.trim() || loading) return;
     const userText = input.trim();
-    const userMsg: Msg = { id: String(Date.now()), role: "user", text: userText };
+    const userMsg: Msg = { id: `u_${Date.now()}`, role: "user", text: userText };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
-    setError(null);
     setNotice(null);
     track("chat_message_sent", { length: userMsg.text.length });
 
-    if (looksLikeMealLog(userText)) {
-      const items = parseMealLogItems(userText);
-      if (items.length > 0) {
-        setFoodItems(items);
-        setFoodPrompt(`I see ${items.map((i) => i.label).join(", ")} — is this right?`);
-      } else {
-        setFoodItems([]);
-        setFoodPrompt(null);
-      }
+    const mealItems = looksLikeMealLog(userText) ? parseMealLogItems(userText) : [];
+    if (mealItems.length > 0) {
+      setFoodItems(mealItems);
+      setFoodPrompt(`Confirm these dishes from your message: ${mealItems.map((i) => i.label).join(", ")}`);
+    } else {
+      setFoodItems([]);
+      setFoodPrompt(null);
     }
 
-    try {
-      const res = await sendCoachChat({ message: userMsg.text });
-      if (res.degraded && res.message) {
-        setNotice(res.message);
-      }
-      setMessages((prev) => [
-        ...prev,
-        { id: String(Date.now() + 1), role: "coach", ai: res.aiObservation, text: res.reply },
-      ]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Coach chat failed");
-    } finally {
-      setLoading(false);
-      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+    // Always produce a coach bubble — sendCoachChat never throws empty-handed.
+    const res = await sendCoachChat({ message: userMsg.text });
+    if (res.degraded && res.message) {
+      setNotice(res.message);
     }
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `c_${Date.now()}`,
+        role: "coach",
+        ai: true,
+        text: res.reply?.trim() || "Draft coaching note — edit before applying.",
+      },
+    ]);
+    setLoading(false);
+    scrollToEnd();
   }
 
   return (
@@ -88,14 +89,19 @@ export default function ChatScreen() {
         keyboardDismissMode="on-drag">
         <Text style={styles.title}>Coach Chat</Text>
         <Text style={styles.subtitle}>{coachingOn ? "Advanced coaching enabled" : "Coaching limited by flag"}</Text>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
         {messages.map((m) => (
           <View key={m.id} style={[styles.bubble, m.role === "user" ? styles.user : styles.coach]}>
-            {m.ai ? <Text style={styles.ai}>AI observation</Text> : null}
+            {m.ai ? <Text style={styles.ai}>AI observation — editable</Text> : null}
             <Text style={m.role === "user" ? styles.userBubbleText : styles.bubbleText}>{m.text}</Text>
           </View>
         ))}
+        {loading ? (
+          <View style={[styles.bubble, styles.coach]}>
+            <Text style={styles.ai}>Coach</Text>
+            <Text style={styles.bubbleText}>Thinking…</Text>
+          </View>
+        ) : null}
         {foodPrompt && foodItems.length > 0 ? (
           <ConfirmationChatCard
             prompt={foodPrompt}
@@ -103,20 +109,19 @@ export default function ChatScreen() {
             onToggle={(id) =>
               setFoodItems((prev) => prev.map((i) => (i.id === id ? { ...i, confirmed: !i.confirmed } : i)))
             }
-            onConfirmAll={() =>
+            onConfirmAll={() => {
+              const confirmed = foodItems.filter((i) => i.confirmed).map((i) => i.label);
               setMessages((prev) => [
                 ...prev,
                 {
-                  id: String(Date.now()),
+                  id: `confirm_${Date.now()}`,
                   role: "coach",
                   ai: true,
-                  text: `Confirmed: ${foodItems
-                    .filter((i) => i.confirmed)
-                    .map((i) => i.label)
-                    .join(", ") || "nothing"} — still editable in Nutrition before macros save.`,
+                  text: `Confirmed: ${confirmed.join(", ") || "nothing"} — open Nutrition to adjust portions before macros save.`,
                 },
-              ])
-            }
+              ]);
+              scrollToEnd();
+            }}
           />
         ) : null}
       </ScrollView>
@@ -128,7 +133,9 @@ export default function ChatScreen() {
           value={input}
           onChangeText={setInput}
           editable={!loading}
-          onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
+          onSubmitEditing={send}
+          returnKeyType="send"
+          onFocus={scrollToEnd}
         />
         <Pressable style={[styles.send, loading && styles.sendDisabled]} onPress={send} disabled={loading}>
           {loading ? <ActivityIndicator color={palette.white} /> : <Text style={styles.sendText}>Send</Text>}
@@ -143,7 +150,6 @@ const styles = StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 24 },
   title: { fontSize: typography.fontSize.xl, fontWeight: "700", color: semantic.textPrimary },
   subtitle: { fontSize: typography.fontSize.sm, color: semantic.textMuted, marginBottom: spacing.sm },
-  error: { color: semantic.textDanger, fontSize: typography.fontSize.sm },
   notice: { color: semantic.textSecondary, fontSize: typography.fontSize.sm },
   bubble: { padding: spacing.md, borderRadius: radii.lg, maxWidth: "92%" },
   user: { alignSelf: "flex-end", backgroundColor: palette.emerald },
