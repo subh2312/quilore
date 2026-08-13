@@ -2,6 +2,14 @@
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
+- **Branch:** cursor-fix-exercise-revisions-snapshot-jsonb-b3f3
+- **PR:** https://github.com/subh2312/quilore/pull/13
+- **What:** Map `exercise_revisions.snapshot` and `subscription_receipts.raw_payload` as JSONB via `@JdbcTypeCode(SqlTypes.JSON)` (were varchar in JPA).
+- **Why:** Pi deploy passed SSH/git/pull but backend failed health: Hibernate validate found jsonb, expected varchar(8000) on `snapshot`.
+- **How:** Align entity JDBC types with Flyway V3/V7; no DB migration (schema already correct).
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
 - **Branch:** cursor-fix-deploy-ssh-key-b3f3
 - **PR:** https://github.com/subh2312/quilore/pull/12
 - **What:** Pi deploy: validate `DEPLOY_SSH_KEY` + SSH smoke test; fix git fetch auth to Basic `x-access-token` (Bearer was failing on the Pi).

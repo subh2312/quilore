@@ -6,6 +6,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -23,7 +25,9 @@ public class ExerciseRevisionEntity {
     @Column(nullable = false)
     private int version;
 
-    @Column(nullable = false, length = 8000)
+    /** DB column is JSONB (V3); keep Java as String JSON payload. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false)
     private String snapshot;
 
     @Column(nullable = false, length = 120)

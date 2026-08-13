@@ -6,6 +6,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -35,7 +37,9 @@ public class SubscriptionReceiptEntity {
     @Column(nullable = false, length = 32)
     private String status;
 
-    @Column(name = "raw_payload", nullable = false, length = 4000)
+    /** DB column is JSONB (V7); keep Java as String JSON payload. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_payload", nullable = false)
     private String rawPayload = "{}";
 
     @Column(name = "created_at", nullable = false)
