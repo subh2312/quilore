@@ -36,7 +36,7 @@ export type CoachProgramResponse = {
   title?: string;
   summary?: string;
   exercises?: CoachProgramExercise[];
-  sessions?: Array<{ dayLabel: string; focus: string; exercises: CoachProgramExercise[] }>;
+  sessions?: { dayLabel: string; focus: string; exercises: CoachProgramExercise[] }[];
 };
 export type WorkoutExercise = { name: string; sets: number; reps: number; weightKg?: number };
 export type OcrMapRequest = { text: string; source?: string };

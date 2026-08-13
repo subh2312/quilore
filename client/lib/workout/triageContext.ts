@@ -38,7 +38,7 @@ export function recentTrainingContext(regionId: string, lookbackHours = 72): Rec
   for (const row of workouts) {
     const completedAt = Date.parse(String(row.completedAt ?? row.updatedAt ?? 0));
     if (completedAt && completedAt < cutoff) continue;
-    const exercises = (row.exercises as Array<{ name?: string }> | undefined) ?? [];
+    const exercises = (row.exercises as { name?: string }[] | undefined) ?? [];
     for (const ex of exercises) {
       if (ex.name) names.push(ex.name);
     }

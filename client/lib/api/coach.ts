@@ -183,7 +183,7 @@ export async function requestProgramGeneration(
       message?: string;
       program?: {
         title?: string;
-        sessions?: Array<{ dayLabel: string; focus: string; exercises: CoachProgramExercise[] }>;
+        sessions?: { dayLabel: string; focus: string; exercises: CoachProgramExercise[] }[];
       };
     }>('/api/coach/program', {
       method: 'POST',

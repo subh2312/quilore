@@ -43,6 +43,7 @@ export default function WorkoutScreen() {
   const [draftExercises, setDraftExercises] = useState<TemplateExercise[]>([]);
   const [routineTitle, setRoutineTitle] = useState<string | null>(null);
   const [routineNote, setRoutineNote] = useState<string | null>(null);
+  const signedOutSummary = "Sign in so routines can use your goals and equipment.";
   const [prefsSummary, setPrefsSummary] = useState("Loading preferences…");
   const [generating, setGenerating] = useState(false);
   const [sessionSummary, setSessionSummary] = useState<SessionSummaryResponse | null>(null);
@@ -52,10 +53,8 @@ export default function WorkoutScreen() {
   const [manageOpen, setManageOpen] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      setPrefsSummary("Sign in so routines can use your goals and equipment.");
-      return;
-    }
+    if (!user) return;
+    let cancelled = false;
     void (async () => {
       try {
         const [profile, goal] = await Promise.all([fetchProfile(user.id), fetchCurrentGoal(user.id)]);
@@ -63,11 +62,18 @@ export default function WorkoutScreen() {
         const exp = profile?.trainingExperience ?? "experience n/a";
         const equip = profile?.equipmentAccess?.trim() || "equipment not set";
         const days = Number(goal.schedulePrefs?.daysPerWeek ?? 4);
-        setPrefsSummary(`${primary} · ${exp} · ${equip} · ${days} days/week`);
+        if (!cancelled) {
+          setPrefsSummary(`${primary} · ${exp} · ${equip} · ${days} days/week`);
+        }
       } catch {
-        setPrefsSummary("Could not load preferences — generation still uses local defaults.");
+        if (!cancelled) {
+          setPrefsSummary("Could not load preferences — generation still uses local defaults.");
+        }
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   async function generateFromPreferences() {
@@ -279,7 +285,9 @@ export default function WorkoutScreen() {
             { backgroundColor: c.surfaceMuted, borderColor: c.border },
           ]}>
           <Text style={[styles.section, { color: c.textPrimary }]}>Generate from preferences</Text>
-          <Text style={[styles.prefs, { color: c.textSecondary }]}>{prefsSummary}</Text>
+          <Text style={[styles.prefs, { color: c.textSecondary }]}>
+            {user ? prefsSummary : signedOutSummary}
+          </Text>
           <Pressable
             style={[styles.primary, { backgroundColor: c.primary }, generating && styles.disabled]}
             onPress={generateFromPreferences}

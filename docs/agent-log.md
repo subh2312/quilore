@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor-ux-feedback-fixes-1811
 - **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Fix Client ESLint (`--max-warnings 0`) and AI Service ruff E501 so CI Lint & Build passes.
+- **Why:** Workout `setState` in effect, unused imports/`Array<T>`/`require()`, and two over-long program-generation strings failed CI.
+- **How:** Derive signed-out prefs copy from `user`; ESM test imports; `T[]` types; wrap `job_queue.py` prompt/programText lines.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
 - **What:** Fix billing hang / logout auth errors / invisible dark-mode text; expand onboarding with physique photos+tags, goal physique, health/pain; triage uses recent workouts and can modify today’s routine; generation reads physique/health + avoidRegions.
 - **Why:** Premium stuck on Processing; “Authentication required” under Logout and broken re-login; screenshots showed unreadable text; users need physique/health inputs to drive plans; arm pain after legs must not look like DOMS.
 - **How:** Mock billing timeout + soft PREMIUM; themed login/logout (`textOnInverse`); always `clearStoredSession` on signOut; theme welcome/SessionSummary/PortionRange/admin/consent step; new onboarding screens; `triageContext` + muscle-map modify CTA; prefs/schedulePrefs persistence.

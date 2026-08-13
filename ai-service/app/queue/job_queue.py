@@ -53,8 +53,10 @@ def _execute_job(job: Job) -> dict[str, Any]:
         days = int(prefs.get("daysPerWeek") or job.payload.get("daysPerWeek") or 4)
         if nim_client.nim_configured():
             result = nim_client.coach_reply(
-                "Design a weekly training program as JSON with sessions[].exercises[{name,sets,reps}]. "
-                f"Goal: {prompt}. Prefs: goal={primary}, experience={experience}, days={days}.",
+                "Design a weekly training program as JSON with "
+                "sessions[].exercises[{name,sets,reps}]. "
+                f"Goal: {prompt}. Prefs: goal={primary}, "
+                f"experience={experience}, days={days}.",
                 escalate=bool(job.payload.get("escalate")),
             )
             if result.get("ok"):
@@ -68,7 +70,10 @@ def _execute_job(job: Job) -> dict[str, Any]:
                 }
         return {
             "status": "completed_stub",
-            "programText": f"{days}-day {primary.replace('_', ' ')} split for {experience} — edit before saving.",
+            "programText": (
+                f"{days}-day {primary.replace('_', ' ')} split "
+                f"for {experience} — edit before saving."
+            ),
             "preferences": {
                 "primaryGoal": primary,
                 "trainingExperience": experience,

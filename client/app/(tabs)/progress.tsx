@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MacroProgressCard } from '@/components/quilore/MacroProgressCard';
 import { SelectionChip } from '@/components/quilore/SelectionChip';
 import { radii, spacing, typography } from '@/constants/DesignTokens';

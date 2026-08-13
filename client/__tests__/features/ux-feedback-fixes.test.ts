@@ -10,6 +10,8 @@ import {
 } from '../../lib/nutrition/macroTargets';
 import { targetMuscleForExercise } from '../../lib/workout/exerciseTargets';
 import { generateProgramFromPreferences } from '../../lib/workout/generateFromPreferences';
+import { localCoachFallback } from '../../lib/api/coach';
+import { triageInterpretation } from '../../lib/workout/triageContext';
 
 describe('Voice set parsing', () => {
   it('parses bench three by eight', () => {
@@ -37,7 +39,6 @@ describe('Meal log parsing', () => {
 
 describe('Coach always replies', () => {
   it('local fallback acknowledges meal log contents', () => {
-    const { localCoachFallback } = require('../../lib/api/coach') as typeof import('../../lib/api/coach');
     const res = localCoachFallback('Log paratha and alu bhaji for breakfast');
     expect(res.reply.toLowerCase()).toContain('paratha');
     expect(res.reply.length).toBeGreaterThan(20);
@@ -105,7 +106,6 @@ describe('Preference-based program generation', () => {
 
 describe('Triage recent training context', () => {
   it('flags arm pain after legs as not training soreness', () => {
-    const { triageInterpretation } = require('../../lib/workout/triageContext') as typeof import('../../lib/workout/triageContext');
     const result = triageInterpretation({
       regionId: 'shoulders',
       descriptors: ['sore', 'aching'],

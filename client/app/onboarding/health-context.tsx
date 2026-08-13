@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { OnboardingStepLayout } from '@/components/quilore/OnboardingStepLayout';
 import { SelectionChip } from '@/components/quilore/SelectionChip';
-import { radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { radii, spacing, typography } from '@/constants/DesignTokens';
 import { useThemeColors } from '@/hooks/useTheme';
 import { getOnboardingDraft, saveOnboardingDraft } from '@/lib/onboarding/storage';
 import { useAuth } from '@/context/AuthContext';

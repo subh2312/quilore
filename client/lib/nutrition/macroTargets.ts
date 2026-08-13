@@ -157,14 +157,14 @@ export async function fetchLatestMacroTargets(userId: string): Promise<MacroTarg
   const cached = getCachedMacroTargets();
   try {
     const history = await apiRequest<
-      Array<{
+      {
         goalType?: string;
         targetCalories: number;
         targetProteinG: number;
         targetCarbsG: number;
         targetFatG: number;
         policyVersion?: string;
-      }>
+      }[]
     >(`/api/nutrition/targets/macros/${userId}/history`);
     const latest = history[history.length - 1];
     if (!latest) return cached;
