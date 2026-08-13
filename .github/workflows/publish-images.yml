@@ -408,10 +408,10 @@ jobs:
         run: |
           set -euo pipefail
           # Pass token via env to remote; never embed in git remote URL.
-          ssh quilore-pi \
-            "DEPLOY_PATH='${DEPLOY_PATH}' GHCR_USER='${GHCR_USER}' GHCR_TOKEN='${GHCR_TOKEN}' GIT_REF='${GIT_REF}' REPO='${REPO}' BACKEND_IMAGE='${{ steps.pins.outputs.backend_image }}' AI_SERVICE_IMAGE='${{ steps.pins.outputs.ai_image }}' DEPLOY_BACKEND='${{ steps.pins.outputs.deploy_backend }}' DEPLOY_AI='${{ steps.pins.outputs.deploy_ai }}' bash -s" <<'EOF'
-          set -euo pipefail
-          mkdir -p "${DEPLOY_PATH}"
+          # Pipe ensure-deploy-path.sh first so a dead SSD prints mount/dmesg instead of a bare mkdir EIO.
+          {
+            cat deploy/scripts/ensure-deploy-path.sh
+            cat <<'EOF'
           cd "${DEPLOY_PATH}"
           if [ ! -d .git ]; then
             git clone "https://github.com/${REPO}.git" .
@@ -431,6 +431,8 @@ jobs:
           echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
           bash deploy/scripts/deploy-pi.sh
           EOF
+          } | ssh quilore-pi \
+            "DEPLOY_PATH='${DEPLOY_PATH}' GHCR_USER='${GHCR_USER}' GHCR_TOKEN='${GHCR_TOKEN}' GIT_REF='${GIT_REF}' REPO='${REPO}' BACKEND_IMAGE='${{ steps.pins.outputs.backend_image }}' AI_SERVICE_IMAGE='${{ steps.pins.outputs.ai_image }}' DEPLOY_BACKEND='${{ steps.pins.outputs.deploy_backend }}' DEPLOY_AI='${{ steps.pins.outputs.deploy_ai }}' bash -s"
 
       - name: Skip note for client-only
         if: needs.changes.outputs.client == 'true' && needs.changes.outputs.any_server != 'true'

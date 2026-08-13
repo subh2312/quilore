@@ -39,6 +39,24 @@ Repo → Settings → Secrets and variables → Actions:
 
 Also seed `${DEPLOY_PATH}/.env` on the Pi once (JWT/encryption/internal token/mock receipts). Hermes/HA are left alone; Docker root is not moved.
 
+### Pi deploy: `mkdir … Input/output error`
+
+If **Deploy changed services to Pi** fails with `mkdir: cannot create directory ‘/mnt/ssd/apps’: Input/output error`, GHCR publish already succeeded. The Pi SSD mount (Docker data-root lives there too) is unhealthy.
+
+On the Pi:
+
+```bash
+mount | grep ssd
+sudo dmesg -T | tail -40
+# if the USB/SATA disk dropped:
+sudo umount /mnt/ssd || true
+sudo fsck -y /dev/disk/by-label/<ssd>   # use the real device
+sudo mount /mnt/ssd
+ls -ld /mnt/ssd/apps/quilore
+```
+
+Then re-run **Publish — Versioned Container Images** (workflow_dispatch) for `dev`. Do not relocate Docker root.
+
 ## Apply on a VPS / local host
 
 Images are **`linux/arm64` only** (Pi / ARM hosts). There is no amd64 publish channel.

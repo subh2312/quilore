@@ -2,6 +2,13 @@
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
+- **Branch:** cursor/fix-pi-ssd-deploy-preflight-1811
+- **What:** Pi deploy preflight for `/mnt/ssd` I/O errors: skip mkdir when checkout exists; print mount/df/dmesg instead of a bare mkdir EIO.
+- **Why:** After PR #15 merge, Publish images succeeded but **Deploy changed services to Pi** failed: `mkdir: cannot create directory ‘/mnt/ssd/apps’: Input/output error`. SSH/tunnel/GHCR were fine; the SSD mount was not.
+- **How:** `deploy/scripts/ensure-deploy-path.sh` piped over SSH before git/docker; unit test + README remount steps.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
 - **Branch:** cursor-ux-feedback-fixes-1811
 - **PR:** https://github.com/subh2312/quilore/pull/15
 - **What:** Fix Client ESLint (`--max-warnings 0`) and AI Service ruff E501 so CI Lint & Build passes.
