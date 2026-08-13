@@ -30,6 +30,7 @@ function RootLayout() {
   });
   const [splashDone, setSplashDone] = useState(false);
   const [nativeSplashHidden, setNativeSplashHidden] = useState(false);
+  const [hydrateDone, setHydrateDone] = useState(false);
 
   useEffect(() => {
     if (error) throw error;
@@ -37,10 +38,22 @@ function RootLayout() {
 
   useEffect(() => {
     if (!loaded) return;
-    void hydrateFromDatabase();
+    let cancelled = false;
+    void (async () => {
+      try {
+        await hydrateFromDatabase();
+      } catch {
+        // Offline hydrate is best-effort; still allow startup metrics.
+      } finally {
+        if (!cancelled) setHydrateDone(true);
+      }
+    })();
     void SplashScreen.hideAsync()
       .then(() => setNativeSplashHidden(true))
       .catch(() => setNativeSplashHidden(true));
+    return () => {
+      cancelled = true;
+    };
   }, [loaded]);
 
   if (!loaded) {
@@ -49,7 +62,7 @@ function RootLayout() {
 
   return (
     <AuthProvider>
-      <RootLayoutNav splashDone={splashDone} />
+      <RootLayoutNav splashDone={splashDone} hydrateDone={hydrateDone} />
       {nativeSplashHidden && !splashDone ? (
         <AnimatedSplash onFinish={() => setSplashDone(true)} />
       ) : null}
@@ -57,19 +70,26 @@ function RootLayout() {
   );
 }
 
-function RootLayoutNav({ splashDone }: { splashDone: boolean }) {
+function RootLayoutNav({
+  splashDone,
+  hydrateDone,
+}: {
+  splashDone: boolean;
+  hydrateDone: boolean;
+}) {
   const colorScheme = useColorScheme();
   const { isLoading } = useAuth();
   const { markInteractive } = useObserve();
-  useProtectedRoute(splashDone && !isLoading);
+  const appReady = splashDone && hydrateDone && !isLoading;
+  useProtectedRoute(appReady);
 
   useEffect(() => {
-    if (!splashDone || isLoading) return;
-    // App ready for input after fonts, offline hydrate, branded splash, and auth bootstrap.
+    if (!appReady) return;
+    // App ready for input after fonts, awaited offline hydrate, branded splash, and auth bootstrap.
     markInteractive();
-  }, [splashDone, isLoading, markInteractive]);
+  }, [appReady, markInteractive]);
 
-  if (!splashDone || isLoading) {
+  if (!appReady) {
     return <View style={{ flex: 1, backgroundColor: '#059669' }} />;
   }
 
