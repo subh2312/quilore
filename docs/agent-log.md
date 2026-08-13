@@ -2,7 +2,7 @@
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
-- **Branch:** cursor/fix-exercise-revisions-snapshot-jsonb-b3f3
+- **Branch:** cursor-fix-exercise-revisions-snapshot-jsonb-b3f3
 - **PR:** (pending)
 - **What:** Map `exercise_revisions.snapshot` and `subscription_receipts.raw_payload` as JSONB via `@JdbcTypeCode(SqlTypes.JSON)` (were varchar in JPA).
 - **Why:** Pi deploy passed SSH/git/pull but backend failed health: Hibernate validate found jsonb, expected varchar(8000) on `snapshot`.
