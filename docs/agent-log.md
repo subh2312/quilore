@@ -2,7 +2,7 @@
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
-- **Branch:** cursor/ux-feedback-fixes-1811
+- **Branch:** cursor-ux-feedback-fixes-1811
 - **PR:** (pending)
 - **What:** UX feedback fixes — remove hardcoded dalma meal cards; meal/label scan entry points; keyboard avoiding; voice set parser; PDF import clarity; semantic text colors + light UI; visual muscle map; goal→macro recalculation.
 - **Why:** Mobile screenshots showed demo Indian dishes everywhere, missing scan CTAs, keyboard covering inputs, broken voice parse, unclear “Pick PDF”, inconsistent contrast, text-only body triage, and macros ignoring goal changes.
