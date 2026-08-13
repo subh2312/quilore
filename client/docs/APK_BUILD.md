@@ -6,7 +6,7 @@ Build a release APK that talks to your Pi/backend (no Play Store required).
 
 - Node 20+ and `npm install` in `client/`
 - Expo account + EAS CLI (`npm i -g eas-cli`)
-- Expo project GitHub settings:
+- Expo project [GitHub settings](https://expo.dev/accounts/sm1523devs-team/projects/quilore/github):
   - Repository: `subh2312/quilore`
   - **Base directory:** `client` (no leading slash)
 - Backend reachable at `https://quilore.sm4devlabs.dpdns.org`
@@ -35,24 +35,20 @@ eas build -p android --profile preview
 
 ### B) GitHub PR label (Expo GitHub App)
 
-On any PR, add label:
+On any PR, add:
 
 ```text
 eas-build-android:preview
 ```
 
-Syntax: `eas-build-[android|ios|all]:[profile]`. Requires `image` on the profile in `eas.json` (already set to `latest`).
+Syntax: `eas-build-[android|ios|all]:[profile]`. Profiles must set `android.image` / `ios.image` in `eas.json` (this repo uses `latest`).
 
-### C) EAS Workflows
+### C) EAS Workflows (`client/.eas/workflows/`)
 
-Workflow files live next to `eas.json` under `client/.eas/workflows/`:
-
-| File | Trigger |
+| File | When it runs |
 |---|---|
-| `preview-android.yml` | PR labeled `eas-build-android:preview` |
-| `preview-android-on-dev.yml` | Push to `dev` that touches `client/**` |
-
-Manual run:
+| `preview-android.yml` | Manual: `eas workflow:run .eas/workflows/preview-android.yml` |
+| `preview-android-on-dev.yml` | Push to `dev` that changes `client/**` |
 
 ```bash
 cd client
@@ -60,6 +56,8 @@ eas workflow:run .eas/workflows/preview-android.yml
 ```
 
 Skip auto workflows with `[eas skip]`, `[skip eas]`, or `[no eas]` in the commit message.
+
+Label builds (B) and Workflows (C) are separate: labels go through the Expo GitHub App; workflows are the YAML files above. Do not also add a workflow `on.pull_request_labeled` for `eas-build-android:preview` or you may get duplicate builds.
 
 ## After the build
 

@@ -1,16 +1,14 @@
-# Gym UAT Android APK (EAS preview profile).
-# Triggers:
-#   1) Label a PR with `eas-build-android:preview` (also works via Expo GitHub App labels)
-#   2) Manual: `cd client && eas workflow:run .eas/workflows/preview-android.yml`
+# Manual / CLI preview APK build (same profile as GitHub label builds).
 #
-# Requires Expo project GitHub connection with Base directory = `client`.
+# GitHub PR labels use the Expo GitHub App (no workflow required):
+#   eas-build-android:preview
+#
+# Run this workflow from CLI:
+#   cd client && eas workflow:run .eas/workflows/preview-android.yml
+#
+# Auto on merge: see preview-android-on-dev.yml
 
 name: Preview Android APK
-
-on:
-  pull_request_labeled:
-    labels:
-      - eas-build-android:preview
 
 jobs:
   build_android_preview:
