@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor-ux-feedback-fixes-1811
 - **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Design-system execution: WCAG-safer primary/danger colors; real light/dark `themes` + `useThemeColors` across tabs/onboarding/shared UI; keyboard/scroll-safe onboarding; profile-baseline no longer advances on hard save failure; consent Back; 48px chips/units; reduced-motion; Quilore not-found/modal; scrubbed “Spring Boot” / causalClaim microcopy.
+- **Why:** Audit found tokens unused, broken dark mode, contrast fails, onboarding save bug, missing back on consent, sub-44px unit chips.
+- **How:** `themes.light/dark`, `useTheme`/`SelectionChip`, re-enable `userInterfaceStyle: automatic`, fix baseline `finally` navigation, theme wired screens/components, contrast Jest checks.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
 - **What:** Preference-based routine generation as Workout primary path; PDF/photo/voice/manual as manage tools. Nutrition modes: manual / meal photo / label / packaged with AI macro calc. Profile days/week drives generation.
 - **Why:** User clarified workouts/routines must come from preferences; capture methods are add/update paths. Same model for nutrition logging.
 - **How:** `generateProgramFromPreferences` + Coach program prefs payload + Spring structured draft; Workout hero CTA; Nutrition capture mode grid; confirm → `calculateMeal`.
