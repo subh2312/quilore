@@ -37,6 +37,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "68ee4a84-34f9-48a8-9ac9-8371d83973be"
+      }
+    },
+    "owner": "sm4devlabs"
   }
 }
