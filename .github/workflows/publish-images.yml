@@ -295,15 +295,32 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
-      - name: Install cloudflared (pinned)
+      # cloudflared is installed on the *GitHub-hosted runner* only, so Actions can
+      # SSH through the Cloudflare Tunnel to the Pi (ProxyCommand).
+      # The Pi already runs cloudflared as the tunnel connector — we never install/restart it there.
+      - name: Install cloudflared on Actions runner (not on Pi)
         env:
-          CLOUDFLARED_VERSION: "2025.2.1"
-          # sha256 of cloudflared-linux-amd64 for CLOUDFLARED_VERSION
-          CLOUDFLARED_SHA256: "afdfadd1ef552e66bffc35246fe30a9bd578356d2d386de95585ccfc432472b8"
+          CLOUDFLARED_VERSION: "2026.7.3"
+          CLOUDFLARED_SHA256: "9d71c677db00134c1bd4144b7783486b654ad281b1ea62b4972098d19f770f17"
         run: |
           set -euo pipefail
-          curl -fsSL -o /tmp/cloudflared \
-            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
+          if command -v cloudflared >/dev/null 2>&1; then
+            cloudflared version
+            exit 0
+          fi
+          url="https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 20 \
+                 -o /tmp/cloudflared "$url"; then
+              break
+            fi
+            echo "download attempt ${attempt} failed; retrying..."
+            sleep $((attempt * 3))
+            if [[ "$attempt" -eq 5 ]]; then
+              echo "::error::Failed to download cloudflared ${CLOUDFLARED_VERSION} for the Actions runner"
+              exit 1
+            fi
+          done
           echo "${CLOUDFLARED_SHA256}  /tmp/cloudflared" | sha256sum -c -
           chmod +x /tmp/cloudflared
           sudo mv /tmp/cloudflared /usr/local/bin/cloudflared
