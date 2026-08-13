@@ -10,10 +10,12 @@ import type { SessionSummaryResponse } from "@/lib/api/types";
 import { appendPartial, getWhisperEngineName, startListening, stopListening } from "@/lib/voice/whisperStub";
 import { upsertLocal } from "@/lib/offline/store";
 import { track } from "@/lib/analytics";
+import { useMarkObserveInteractive } from "@/hooks/useMarkObserveInteractive";
 
 type TemplateExercise = { id: string; name: string; sets: string; reps: string; weightKg?: string };
 
 export default function WorkoutScreen() {
+  useMarkObserveInteractive();
   const sessionStart = useRef(new Date().toISOString());
   const [listening, setListening] = useState(false);
   const [partial, setPartial] = useState("");

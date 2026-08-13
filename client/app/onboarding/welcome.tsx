@@ -6,6 +6,7 @@ import { QuiloreLogo } from '@/components/quilore/QuiloreLogo';
 import { palette, radii, spacing, touchTarget, typography } from '@/constants/DesignTokens';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/context/AuthContext';
+import { useMarkObserveInteractive } from '@/hooks/useMarkObserveInteractive';
 
 const VALUE_PROPS = [
   { title: 'Form & load coaching', body: 'Voice and vision cues you can confirm before they stick.' },
@@ -14,6 +15,7 @@ const VALUE_PROPS = [
 ] as const;
 
 export default function OnboardingWelcomeScreen() {
+  useMarkObserveInteractive();
   const { signOut } = useAuth();
 
   useEffect(() => {

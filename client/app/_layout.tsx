@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { Observe, ObserveRoot, useObserve } from 'expo-observe';
 import { View } from 'react-native';
 import 'react-native-reanimated';
 
@@ -9,6 +10,11 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { AnimatedSplash } from '@/components/quilore/AnimatedSplash';
 import { AuthProvider, useAuth, useProtectedRoute } from '@/context/AuthContext';
 import { hydrateFromDatabase } from '@/lib/offline/store';
+
+// Must run before mount — Expo Router per-route metrics (SDK 56+).
+Observe.configure({
+  integrations: { 'expo-router': true },
+});
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -18,7 +24,7 @@ export const unstable_settings = {
 
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -54,7 +60,14 @@ export default function RootLayout() {
 function RootLayoutNav({ splashDone }: { splashDone: boolean }) {
   const colorScheme = useColorScheme();
   const { isLoading } = useAuth();
+  const { markInteractive } = useObserve();
   useProtectedRoute(splashDone && !isLoading);
+
+  useEffect(() => {
+    if (!splashDone || isLoading) return;
+    // App ready for input after fonts, offline hydrate, branded splash, and auth bootstrap.
+    markInteractive();
+  }, [splashDone, isLoading, markInteractive]);
 
   if (!splashDone || isLoading) {
     return <View style={{ flex: 1, backgroundColor: '#059669' }} />;
@@ -72,3 +85,5 @@ function RootLayoutNav({ splashDone }: { splashDone: boolean }) {
     </ThemeProvider>
   );
 }
+
+export default ObserveRoot.wrap(RootLayout);
