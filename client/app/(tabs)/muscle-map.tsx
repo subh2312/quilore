@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MuscleMapSvg, regionLabel } from '@/components/quilore/MuscleMapSvg';
-import { palette, radii, semantic, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { SelectionChip } from '@/components/quilore/SelectionChip';
+import { radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 import { track } from '@/lib/analytics';
 
 const DESCRIPTORS = ['sore', 'tight', 'sharp', 'swelling', 'aching', 'sudden'];
 
 export default function MuscleMapScreen() {
+  const c = useThemeColors();
   const [side, setSide] = useState<'front' | 'back'>('front');
   const [region, setRegion] = useState<string | undefined>();
   const [selected, setSelected] = useState<string[]>([]);
@@ -27,15 +30,18 @@ export default function MuscleMapScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>Body</Text>
-      <Text style={styles.subtitle}>Interactive muscle map — risk flag only, never a diagnosis</Text>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      style={{ backgroundColor: c.surface }}
+      keyboardShouldPersistTaps="handled">
+      <Text style={[styles.title, { color: c.textPrimary }]}>Body</Text>
+      <Text style={[styles.subtitle, { color: c.textMuted }]}>
+        Interactive muscle map — risk flag only, never a diagnosis
+      </Text>
 
       <View style={styles.row}>
         {(['front', 'back'] as const).map((s) => (
-          <Pressable key={s} style={[styles.chip, side === s && styles.chipOn]} onPress={() => setSide(s)}>
-            <Text style={styles.chipText}>{s}</Text>
-          </Pressable>
+          <SelectionChip key={s} label={s} selected={side === s} onPress={() => setSide(s)} />
         ))}
       </View>
 
@@ -43,40 +49,45 @@ export default function MuscleMapScreen() {
 
       {region ? (
         <View style={styles.form}>
-          <Text style={styles.section}>Pain descriptors · {regionLabel(region)}</Text>
+          <Text style={[styles.section, { color: c.textPrimary }]}>
+            Pain descriptors · {regionLabel(region)}
+          </Text>
           <View style={styles.wrapChips}>
             {DESCRIPTORS.map((d) => {
               const on = selected.includes(d);
               return (
-                <Pressable
+                <SelectionChip
                   key={d}
-                  style={[styles.chip, on && styles.chipOn]}
+                  label={d}
+                  selected={on}
                   onPress={() =>
                     setSelected((prev) => (on ? prev.filter((x) => x !== d) : [...prev, d]))
-                  }>
-                  <Text style={styles.chipText}>{d}</Text>
-                </Pressable>
+                  }
+                />
               );
             })}
           </View>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              { borderColor: c.border, backgroundColor: c.inputBg, color: c.inputText },
+            ]}
             placeholder="Optional notes (not a diagnosis)"
-            placeholderTextColor={semantic.inputPlaceholder}
+            placeholderTextColor={c.inputPlaceholder}
             value={notes}
             onChangeText={setNotes}
           />
-          <Pressable style={styles.primary} onPress={evaluate}>
-            <Text style={styles.primaryText}>Get risk flag</Text>
+          <Pressable style={[styles.primary, { backgroundColor: c.primary }]} onPress={evaluate}>
+            <Text style={[styles.primaryText, { color: c.textOnPrimary }]}>Get risk flag</Text>
           </Pressable>
         </View>
       ) : null}
 
       {result ? (
-        <View style={styles.result}>
-          <Text style={styles.flag}>{result.flag}</Text>
-          <Text style={styles.body}>{result.message}</Text>
-          <Text style={styles.disclaimer}>
+        <View style={[styles.result, { backgroundColor: c.surfaceMuted }]}>
+          <Text style={[styles.flag, { color: c.textWarning }]}>{result.flag}</Text>
+          <Text style={[styles.body, { color: c.textPrimary }]}>{result.message}</Text>
+          <Text style={[styles.disclaimer, { color: c.textDanger }]}>
             Risk flag only — not a medical diagnosis. Seek a clinician for persistent or severe pain.
           </Text>
         </View>
@@ -86,41 +97,28 @@ export default function MuscleMapScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48, backgroundColor: semantic.surface },
-  title: { fontSize: typography.fontSize.xl, fontWeight: '700', color: semantic.textPrimary },
-  subtitle: { fontSize: typography.fontSize.sm, color: semantic.textMuted },
+  container: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48, flexGrow: 1 },
+  title: { fontSize: typography.fontSize.xl, fontWeight: '700' },
+  subtitle: { fontSize: typography.fontSize.sm },
   row: { flexDirection: 'row', gap: spacing.sm },
   wrapChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: {
-    minHeight: touchTarget.minHeight,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.full,
-    backgroundColor: palette.gray200,
-    justifyContent: 'center',
-  },
-  chipOn: { backgroundColor: palette.amberLight },
-  chipText: { fontWeight: '700', color: semantic.textPrimary, textTransform: 'capitalize' },
   form: { gap: spacing.sm },
-  section: { fontWeight: '700', color: semantic.textPrimary },
+  section: { fontWeight: '700' },
   input: {
     minHeight: touchTarget.minHeight,
     borderWidth: 1,
-    borderColor: semantic.border,
     borderRadius: radii.md,
     paddingHorizontal: spacing.sm,
-    backgroundColor: semantic.inputBg,
-    color: semantic.inputText,
   },
   primary: {
     minHeight: touchTarget.minHeight,
-    backgroundColor: palette.emerald,
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: { color: semantic.textOnPrimary, fontWeight: '700' },
-  result: { backgroundColor: semantic.surfaceMuted, padding: spacing.md, borderRadius: radii.lg, gap: spacing.xs },
-  flag: { fontWeight: '800', color: palette.amber, fontSize: typography.fontSize.lg },
-  body: { color: semantic.textPrimary },
-  disclaimer: { color: semantic.textDanger, fontSize: typography.fontSize.xs },
+  primaryText: { fontWeight: '700' },
+  result: { padding: spacing.md, borderRadius: radii.lg, gap: spacing.xs },
+  flag: { fontWeight: '800', fontSize: typography.fontSize.lg },
+  body: {},
+  disclaimer: { fontSize: typography.fontSize.xs },
 });

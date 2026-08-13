@@ -14,7 +14,8 @@ import { MacroProgressCard } from "@/components/quilore/MacroProgressCard";
 import { ManualMealComposer, MealLine } from "@/components/quilore/ManualMealComposer";
 import { PortionRangeSlider } from "@/components/quilore/PortionRangeSlider";
 import { ConfirmationChatCard, ConfirmItem } from "@/components/quilore/ConfirmationChatCard";
-import { palette, radii, semantic, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { radii, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { useThemeColors } from "@/hooks/useTheme";
 import { calculateMeal, fetchFoodQuality } from "@/lib/api/nutrition";
 import { pushPendingMutations } from "@/lib/api/sync";
 import { upsertLocal } from "@/lib/offline/store";
@@ -75,6 +76,7 @@ function defaultLabelForMode(mode: CaptureMode, fileName?: string): string {
 }
 
 export default function NutritionScreen() {
+  const c = useThemeColors();
   const { user } = useAuth();
   const [mode, setMode] = useState<CaptureMode>("manual");
   const [grams, setGrams] = useState(180);
@@ -176,7 +178,7 @@ export default function NutritionScreen() {
       );
       await applyTotals(totals, `${lines.length} manual items queued for sync`);
     } catch {
-      setSavedNote(`Saved ${lines.length} items offline — will sync via Spring Boot.`);
+      setSavedNote(`Saved ${lines.length} items offline — will sync when you are back online.`);
     }
   }
 
@@ -219,63 +221,75 @@ export default function NutritionScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: c.surface }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={88}>
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
-        <Text style={styles.title}>Nutrition</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: c.textPrimary }]}>Nutrition</Text>
+        <Text style={[styles.subtitle, { color: c.textMuted }]}>
           Log manually or from photos — AI estimates macros · goal:{" "}
           {(targets.primaryGoal || "maintain").replace("_", " ")}
         </Text>
         <MacroProgressCard macros={macros} />
 
-        <Text style={styles.section}>How do you want to log?</Text>
+        <Text style={[styles.section, { color: c.textPrimary }]}>How do you want to log?</Text>
         <View style={styles.modeGrid}>
-          {CAPTURE_MODES.map((m) => (
-            <Pressable
-              key={m.id}
-              style={[styles.modeChip, mode === m.id && styles.modeChipOn]}
-              onPress={() => {
-                setMode(m.id);
-                if (m.id === "manual") {
-                  setScanItems([]);
-                  setScanPrompt(null);
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={m.label}>
-              <Text style={[styles.modeLabel, mode === m.id && styles.modeLabelOn]}>{m.label}</Text>
-              <Text style={styles.modeHint}>{m.hint}</Text>
-            </Pressable>
-          ))}
+          {CAPTURE_MODES.map((m) => {
+            const on = mode === m.id;
+            return (
+              <Pressable
+                key={m.id}
+                style={[
+                  styles.modeChip,
+                  {
+                    borderColor: on ? c.primary : c.border,
+                    backgroundColor: on ? c.confirmSoft : c.surfaceMuted,
+                  },
+                ]}
+                onPress={() => {
+                  setMode(m.id);
+                  if (m.id === "manual") {
+                    setScanItems([]);
+                    setScanPrompt(null);
+                  }
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={m.label}>
+                <Text style={[styles.modeLabel, { color: on ? c.chipTextSelected : c.textPrimary }]}>
+                  {m.label}
+                </Text>
+                <Text style={[styles.modeHint, { color: c.textMuted }]}>{m.hint}</Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         {mode === "manual" ? (
           <>
-            <Text style={styles.section}>Manual log</Text>
+            <Text style={[styles.section, { color: c.textPrimary }]}>Manual log</Text>
             <ManualMealComposer onSave={saveManual} />
           </>
         ) : (
           <>
-            <Text style={styles.section}>
+            <Text style={[styles.section, { color: c.textPrimary }]}>
               {mode === "meal" ? "Meal photo" : mode === "label" ? "Nutrition label" : "Packaged food / drink"}
             </Text>
-            <Text style={styles.hint}>
+            <Text style={[styles.hint, { color: c.textSecondary }]}>
               Capture a photo — confirm what AI detected — macros calculate automatically (still editable).
             </Text>
             <Pressable
-              style={[styles.primary, scanBusy && styles.disabled]}
+              style={[styles.primary, { backgroundColor: c.primary }, scanBusy && styles.disabled]}
               onPress={() => pickPhoto(mode)}
               disabled={scanBusy}
               accessibilityRole="button">
               {scanBusy ? (
-                <ActivityIndicator color={palette.white} />
+                <ActivityIndicator color={c.textOnPrimary} />
               ) : (
-                <Text style={styles.primaryText}>
+                <Text style={[styles.primaryText, { color: c.textOnPrimary }]}>
                   {mode === "meal"
                     ? "Take / pick meal photo"
                     : mode === "label"
@@ -300,50 +314,45 @@ export default function NutritionScreen() {
                     onConfirmAll={confirmScan}
                   />
                 ) : null}
-                {calcBusy ? <Text style={styles.note}>Calculating macros…</Text> : null}
+                {calcBusy ? <Text style={[styles.note, { color: c.textSuccess }]}>Calculating macros…</Text> : null}
               </>
             ) : null}
           </>
         )}
 
-        {qualityNote ? <Text style={styles.note}>{qualityNote}</Text> : null}
-        {savedNote ? <Text style={styles.note}>{savedNote}</Text> : null}
+        {qualityNote ? <Text style={[styles.note, { color: c.textSuccess }]}>{qualityNote}</Text> : null}
+        {savedNote ? <Text style={[styles.note, { color: c.textSuccess }]}>{savedNote}</Text> : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: semantic.surface },
+  root: { flex: 1 },
   container: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 },
-  title: { fontSize: typography.fontSize.xl, fontWeight: "700", color: semantic.textPrimary },
-  subtitle: { fontSize: typography.fontSize.sm, color: semantic.textMuted },
-  section: { fontSize: typography.fontSize.md, fontWeight: "700", color: semantic.textPrimary },
-  hint: { fontSize: typography.fontSize.sm, color: semantic.textSecondary, marginTop: -spacing.sm },
-  note: { color: palette.emeraldDark, fontSize: typography.fontSize.sm },
+  title: { fontSize: typography.fontSize.xl, fontWeight: "700" },
+  subtitle: { fontSize: typography.fontSize.sm },
+  section: { fontSize: typography.fontSize.md, fontWeight: "700" },
+  hint: { fontSize: typography.fontSize.sm, marginTop: -spacing.sm },
+  note: { fontSize: typography.fontSize.sm },
   modeGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   modeChip: {
     width: "48%",
     minHeight: 72,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: semantic.border,
-    backgroundColor: semantic.surfaceMuted,
     padding: spacing.sm,
     justifyContent: "center",
     gap: 2,
   },
-  modeChipOn: { borderColor: palette.emerald, backgroundColor: semantic.confirmSoft },
-  modeLabel: { fontWeight: "700", color: semantic.textPrimary },
-  modeLabelOn: { color: palette.emeraldDark },
-  modeHint: { fontSize: typography.fontSize.xs, color: semantic.textMuted },
+  modeLabel: { fontWeight: "700" },
+  modeHint: { fontSize: typography.fontSize.xs },
   primary: {
     minHeight: touchTarget.minHeight,
-    backgroundColor: palette.emerald,
     borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryText: { color: semantic.textOnPrimary, fontWeight: "700" },
+  primaryText: { fontWeight: "700" },
   disabled: { opacity: 0.6 },
 });

@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 
 export function VoiceCaptureIndicator({
   listening,
@@ -10,18 +11,24 @@ export function VoiceCaptureIndicator({
   partial: string;
   onToggle: () => void;
 }) {
+  const c = useThemeColors();
   return (
     <View style={styles.wrap}>
       <Pressable
-        style={[styles.mic, listening && styles.micOn]}
+        style={[
+          styles.mic,
+          { backgroundColor: listening ? c.dangerFill : c.surfaceInverse },
+        ]}
         onPress={onToggle}
         accessibilityRole="button"
         accessibilityLabel="Voice capture">
-        <Text style={styles.micText}>{listening ? '● Listening' : '🎤 Voice log'}</Text>
+        <Text style={[styles.micText, { color: c.textOnPrimary }]}>
+          {listening ? '● Listening' : '🎤 Voice log'}
+        </Text>
       </Pressable>
       {listening || partial ? (
-        <View style={styles.overlay}>
-          <Text style={styles.partial}>{partial || '…'}</Text>
+        <View style={[styles.overlay, { backgroundColor: c.surfaceInverse }]}>
+          <Text style={[styles.partial, { color: c.textOnPrimary }]}>{partial || '…'}</Text>
         </View>
       ) : null}
     </View>
@@ -33,17 +40,14 @@ const styles = StyleSheet.create({
   mic: {
     minHeight: touchTarget.minHeight,
     borderRadius: radii.full,
-    backgroundColor: palette.gray800,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
-  micOn: { backgroundColor: palette.red },
-  micText: { color: palette.white, fontWeight: '700', fontSize: typography.fontSize.md },
+  micText: { fontWeight: '700', fontSize: typography.fontSize.md },
   overlay: {
-    backgroundColor: palette.gray900,
     borderRadius: radii.md,
     padding: spacing.md,
   },
-  partial: { color: palette.white, fontSize: typography.fontSize.sm },
+  partial: { fontSize: typography.fontSize.sm },
 });

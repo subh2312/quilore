@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { palette, radii, semantic, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 
 export const MUSCLE_REGIONS = [
   { id: 'chest', label: 'Chest', side: 'front', top: '22%', left: '28%', width: '44%', height: '12%' },
@@ -25,16 +26,23 @@ export function MuscleMapSvg({
   selected?: string;
   onSelect: (regionId: string) => void;
 }) {
+  const c = useThemeColors();
   const regions = MUSCLE_REGIONS.filter((r) => r.side === side);
 
   return (
     <View style={styles.wrap} accessibilityLabel="Interactive muscle map">
-      <Text style={styles.caption}>{side === 'front' ? 'Front view' : 'Back view'} — tap a highlighted region</Text>
-      <View style={styles.silhouetteFrame}>
-        <View style={styles.head} />
+      <Text style={[styles.caption, { color: c.textSecondary }]}>
+        {side === 'front' ? 'Front view' : 'Back view'} — tap a highlighted region
+      </Text>
+      <View
+        style={[
+          styles.silhouetteFrame,
+          { backgroundColor: c.surfaceMuted, borderColor: c.border },
+        ]}>
+        <View style={[styles.head, { backgroundColor: c.border }]} />
         <View style={styles.torso}>
-          <View style={styles.neck} />
-          <View style={styles.body}>
+          <View style={[styles.neck, { backgroundColor: c.border }]} />
+          <View style={[styles.body, { backgroundColor: c.chipBg }]}>
             {regions.map((r) => (
               <Pressable
                 key={r.id}
@@ -46,18 +54,19 @@ export function MuscleMapSvg({
                     left: r.left,
                     width: r.width,
                     height: r.height,
+                    backgroundColor: selected === r.id ? c.primarySoft : `${c.primary}40`,
+                    borderColor: selected === r.id ? c.textWarning : c.primaryMuted,
                   },
-                  selected === r.id && styles.hotspotOn,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={r.label}>
-                <Text style={[styles.hotspotText, selected === r.id && styles.hotspotTextOn]}>{r.label}</Text>
+                <Text style={[styles.hotspotText, { color: c.textPrimary }]}>{r.label}</Text>
               </Pressable>
             ))}
           </View>
           <View style={styles.legsRow}>
-            <View style={styles.leg} />
-            <View style={styles.leg} />
+            <View style={[styles.leg, { backgroundColor: c.border }]} />
+            <View style={[styles.leg, { backgroundColor: c.border }]} />
           </View>
         </View>
       </View>
@@ -66,80 +75,74 @@ export function MuscleMapSvg({
           <Pressable
             key={`chip_${r.id}`}
             onPress={() => onSelect(r.id)}
-            style={[styles.chip, selected === r.id && styles.chipOn]}
-            accessibilityRole="button">
-            <Text style={styles.chipText}>{r.label}</Text>
+            style={[
+              styles.chip,
+              {
+                backgroundColor: selected === r.id ? c.chipBgSelected : c.surfaceMuted,
+                borderColor: selected === r.id ? c.textWarning : c.border,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: selected === r.id }}>
+            <Text style={[styles.chipText, { color: c.textPrimary }]}>{r.label}</Text>
           </Pressable>
         ))}
       </View>
-      <Text style={styles.disclaimer}>Risk-flag triage only — not a medical diagnosis.</Text>
+      <Text style={[styles.disclaimer, { color: c.textDanger }]}>
+        Risk-flag triage only — not a medical diagnosis.
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
-  caption: { fontSize: typography.fontSize.sm, color: semantic.textSecondary },
+  caption: { fontSize: typography.fontSize.sm },
   silhouetteFrame: {
     alignItems: 'center',
-    backgroundColor: semantic.surfaceMuted,
     borderRadius: radii.lg,
     paddingVertical: spacing.lg,
     borderWidth: 1,
-    borderColor: semantic.border,
   },
   head: {
     width: 48,
     height: 48,
     borderRadius: radii.full,
-    backgroundColor: palette.gray300,
     marginBottom: 4,
   },
   torso: { alignItems: 'center', width: '100%' },
-  neck: { width: 28, height: 12, backgroundColor: palette.gray300, borderRadius: radii.sm },
+  neck: { width: 28, height: 12, borderRadius: radii.sm },
   body: {
     width: 200,
     height: 280,
-    backgroundColor: palette.gray200,
     borderRadius: 80,
     overflow: 'hidden',
     position: 'relative',
   },
   hotspot: {
     position: 'absolute',
-    backgroundColor: 'rgba(16, 185, 129, 0.25)',
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: palette.emeraldLight,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
     minHeight: 40,
   },
-  hotspotOn: {
-    backgroundColor: palette.amberLight,
-    borderColor: palette.amber,
-  },
   hotspotText: {
     fontSize: typography.fontSize.xs,
     fontWeight: '700',
-    color: semantic.textPrimary,
     textAlign: 'center',
   },
-  hotspotTextOn: { color: palette.gray900 },
   legsRow: { flexDirection: 'row', gap: 16, marginTop: -8 },
-  leg: { width: 48, height: 72, backgroundColor: palette.gray300, borderRadius: 20 },
+  leg: { width: 48, height: 72, borderRadius: 20 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     minHeight: touchTarget.minHeight,
     paddingHorizontal: spacing.md,
     borderRadius: radii.full,
-    backgroundColor: palette.gray100,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: semantic.border,
   },
-  chipOn: { backgroundColor: palette.amberLight, borderColor: palette.amber },
-  chipText: { fontWeight: '600', color: semantic.textPrimary },
-  disclaimer: { fontSize: typography.fontSize.xs, color: semantic.textDanger },
+  chipText: { fontWeight: '600' },
+  disclaimer: { fontSize: typography.fontSize.xs },
 });

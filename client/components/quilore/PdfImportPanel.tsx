@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import { palette, radii, semantic, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { radii, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { useThemeColors } from "@/hooks/useTheme";
 import { runOnDeviceOcr } from "@/lib/ocr/onDeviceOcr";
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function PdfImportPanel({ onImported }: Props) {
+  const c = useThemeColors();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
@@ -46,27 +48,36 @@ export function PdfImportPanel({ onImported }: Props) {
 
   return (
     <View style={styles.box}>
-      <Text style={styles.label}>Import workout PDF or photo</Text>
-      <Text style={styles.hint}>Choose a program PDF or a photo of a written plan — OCR drafts stay editable.</Text>
-      <Pressable style={styles.btn} onPress={pickPdf} disabled={busy} accessibilityLabel="Import workout PDF or photo">
-        {busy ? <ActivityIndicator color={palette.white} /> : <Text style={styles.btnText}>Import PDF / photo</Text>}
+      <Text style={[styles.label, { color: c.textPrimary }]}>Import workout PDF or photo</Text>
+      <Text style={[styles.hint, { color: c.textMuted }]}>
+        Choose a program PDF or a photo of a written plan — OCR drafts stay editable.
+      </Text>
+      <Pressable
+        style={[styles.btn, { backgroundColor: c.primary }]}
+        onPress={pickPdf}
+        disabled={busy}
+        accessibilityLabel="Import workout PDF or photo">
+        {busy ? (
+          <ActivityIndicator color={c.textOnPrimary} />
+        ) : (
+          <Text style={[styles.btnText, { color: c.textOnPrimary }]}>Import PDF / photo</Text>
+        )}
       </Pressable>
-      {note ? <Text style={styles.note}>{note}</Text> : null}
+      {note ? <Text style={[styles.note, { color: c.textSecondary }]}>{note}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   box: { gap: spacing.sm },
-  label: { fontWeight: "700", color: semantic.textPrimary, fontSize: typography.fontSize.md },
-  hint: { fontSize: typography.fontSize.sm, color: semantic.textMuted },
+  label: { fontWeight: "700", fontSize: typography.fontSize.md },
+  hint: { fontSize: typography.fontSize.sm },
   btn: {
     minHeight: touchTarget.minHeight,
-    backgroundColor: palette.emerald,
     borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { color: semantic.textOnPrimary, fontWeight: "700" },
-  note: { fontSize: typography.fontSize.sm, color: semantic.textSecondary },
+  btnText: { fontWeight: "700" },
+  note: { fontSize: typography.fontSize.sm },
 });

@@ -1,27 +1,30 @@
-import { palette } from './DesignTokens';
+import { themes, type ThemeColors } from './DesignTokens';
 
-const tintColorLight = palette.emerald;
-const tintColorDark = palette.emeraldLight;
+export type ColorSchemeName = 'light' | 'dark';
+
+export function getThemeColors(scheme: ColorSchemeName | null | undefined): ThemeColors {
+  return scheme === 'dark' ? themes.dark : themes.light;
+}
 
 export default {
   light: {
-    text: palette.gray900,
-    background: palette.white,
-    tint: tintColorLight,
-    tabIconDefault: palette.gray400,
-    tabIconSelected: tintColorLight,
-    card: palette.gray50,
-    border: palette.gray200,
-    subtitle: palette.gray500,
+    text: themes.light.textPrimary,
+    background: themes.light.surface,
+    tint: themes.light.tabIconSelected,
+    tabIconDefault: themes.light.tabIconDefault,
+    tabIconSelected: themes.light.tabIconSelected,
+    card: themes.light.surfaceMuted,
+    border: themes.light.border,
+    subtitle: themes.light.textMuted,
   },
   dark: {
-    text: palette.white,
-    background: palette.gray900,
-    tint: tintColorDark,
-    tabIconDefault: palette.gray500,
-    tabIconSelected: tintColorDark,
-    card: palette.gray800,
-    border: palette.gray700,
-    subtitle: palette.gray400,
+    text: themes.dark.textPrimary,
+    background: themes.dark.surface,
+    tint: themes.dark.tabIconSelected,
+    tabIconDefault: themes.dark.tabIconDefault,
+    tabIconSelected: themes.dark.tabIconSelected,
+    card: themes.dark.surfaceMuted,
+    border: themes.dark.border,
+    subtitle: themes.dark.textMuted,
   },
 };

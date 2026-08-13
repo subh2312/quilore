@@ -14,7 +14,8 @@ import { AnimatedExerciseDemo } from "@/components/quilore/AnimatedExerciseDemo"
 import { PdfImportPanel } from "@/components/quilore/PdfImportPanel";
 import { SessionSummaryCard } from "@/components/quilore/SessionSummaryCard";
 import { VoiceCaptureIndicator } from "@/components/quilore/VoiceCaptureIndicator";
-import { palette, radii, semantic, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { radii, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { useThemeColors } from "@/hooks/useTheme";
 import { fetchSessionSummary } from "@/lib/api/workout";
 import { requestProgramGeneration } from "@/lib/api/coach";
 import { fetchCurrentGoal, fetchProfile } from "@/lib/api/profile";
@@ -32,6 +33,7 @@ type TemplateExercise = { id: string; name: string; sets: string; reps: string; 
 
 export default function WorkoutScreen() {
   useMarkObserveInteractive();
+  const c = useThemeColors();
   const { user } = useAuth();
   const sessionStart = useRef(new Date().toISOString());
   const [listening, setListening] = useState(false);
@@ -216,66 +218,84 @@ export default function WorkoutScreen() {
   }
 
   const activeName = draftExercises[draftExercises.length - 1]?.name ?? draftExercises[0]?.name ?? "Squat";
+  const inputStyle = [
+    styles.input,
+    { borderColor: c.border, color: c.inputText, backgroundColor: c.inputBg },
+  ];
+  const smallStyle = [
+    styles.small,
+    { borderColor: c.border, color: c.inputText, backgroundColor: c.inputBg },
+  ];
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: c.surface }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={88}>
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
-        <Text style={styles.title}>Workout</Text>
-        <Text style={styles.subtitle}>Routines from your preferences — import/voice/manual to refine</Text>
+        <Text style={[styles.title, { color: c.textPrimary }]}>Workout</Text>
+        <Text style={[styles.subtitle, { color: c.textMuted }]}>
+          Routines from your preferences — import/voice/manual to refine
+        </Text>
 
-        <View style={styles.heroCard}>
-          <Text style={styles.section}>Generate from preferences</Text>
-          <Text style={styles.prefs}>{prefsSummary}</Text>
+        <View
+          style={[
+            styles.heroCard,
+            { backgroundColor: c.surfaceMuted, borderColor: c.border },
+          ]}>
+          <Text style={[styles.section, { color: c.textPrimary }]}>Generate from preferences</Text>
+          <Text style={[styles.prefs, { color: c.textSecondary }]}>{prefsSummary}</Text>
           <Pressable
-            style={[styles.primary, generating && styles.disabled]}
+            style={[styles.primary, { backgroundColor: c.primary }, generating && styles.disabled]}
             onPress={generateFromPreferences}
             disabled={generating || !user}
             accessibilityRole="button"
             accessibilityLabel="Generate routine from preferences">
             {generating ? (
-              <ActivityIndicator color={palette.white} />
+              <ActivityIndicator color={c.textOnPrimary} />
             ) : (
-              <Text style={styles.primaryText}>Generate my routine</Text>
+              <Text style={[styles.primaryText, { color: c.textOnPrimary }]}>Generate my routine</Text>
             )}
           </Pressable>
-          {routineTitle ? <Text style={styles.routineTitle}>{routineTitle}</Text> : null}
-          {routineNote ? <Text style={styles.note}>{routineNote}</Text> : null}
+          {routineTitle ? (
+            <Text style={[styles.routineTitle, { color: c.textSuccess }]}>{routineTitle}</Text>
+          ) : null}
+          {routineNote ? <Text style={[styles.note, { color: c.textSecondary }]}>{routineNote}</Text> : null}
         </View>
 
-        <Text style={styles.section}>Today’s draft (editable)</Text>
+        <Text style={[styles.section, { color: c.textPrimary }]}>Today’s draft (editable)</Text>
         {draftExercises.length === 0 ? (
-          <Text style={styles.hint}>No exercises yet — generate from preferences, or add via the tools below.</Text>
+          <Text style={[styles.hint, { color: c.textMuted }]}>
+            No exercises yet — generate from preferences, or add via the tools below.
+          </Text>
         ) : null}
         {draftExercises.map((ex) => (
           <View key={ex.id} style={styles.row}>
             <TextInput
-              style={styles.input}
+              style={inputStyle}
               value={ex.name}
               placeholder="Exercise"
-              placeholderTextColor={semantic.inputPlaceholder}
+              placeholderTextColor={c.inputPlaceholder}
               onChangeText={(t) => setDraftExercises((p) => p.map((e) => (e.id === ex.id ? { ...e, name: t } : e)))}
             />
             <TextInput
-              style={styles.small}
+              style={smallStyle}
               value={ex.sets}
               keyboardType="number-pad"
               placeholder="sets"
-              placeholderTextColor={semantic.inputPlaceholder}
+              placeholderTextColor={c.inputPlaceholder}
               onChangeText={(t) => setDraftExercises((p) => p.map((e) => (e.id === ex.id ? { ...e, sets: t } : e)))}
             />
-            <Text style={styles.times}>×</Text>
+            <Text style={[styles.times, { color: c.textSecondary }]}>×</Text>
             <TextInput
-              style={styles.small}
+              style={smallStyle}
               value={ex.reps}
               keyboardType="number-pad"
               placeholder="reps"
-              placeholderTextColor={semantic.inputPlaceholder}
+              placeholderTextColor={c.inputPlaceholder}
               onChangeText={(t) => setDraftExercises((p) => p.map((e) => (e.id === ex.id ? { ...e, reps: t } : e)))}
             />
           </View>
@@ -285,30 +305,34 @@ export default function WorkoutScreen() {
           <AnimatedExerciseDemo exerciseName={activeName} targetMuscle={targetMuscleForExercise(activeName)} />
         ) : null}
 
-        <Pressable style={styles.primary} onPress={saveSession}>
-          <Text style={styles.primaryText}>Complete session</Text>
+        <Pressable style={[styles.primary, { backgroundColor: c.primary }]} onPress={saveSession}>
+          <Text style={[styles.primaryText, { color: c.textOnPrimary }]}>Complete session</Text>
         </Pressable>
         <SessionSummaryCard summary={sessionSummary} loading={summaryLoading} />
 
-        <Pressable style={styles.secondary} onPress={() => setManageOpen((v) => !v)}>
-          <Text style={styles.secondaryText}>
+        <Pressable
+          style={[styles.secondary, { borderColor: c.primary }]}
+          onPress={() => setManageOpen((v) => !v)}>
+          <Text style={[styles.secondaryText, { color: c.textSuccess }]}>
             {manageOpen ? "Hide" : "Show"} add / update tools (PDF · photo · voice · manual)
           </Text>
         </Pressable>
 
         {manageOpen ? (
           <View style={styles.manageBox}>
-            <Text style={styles.hint}>
+            <Text style={[styles.hint, { color: c.textMuted }]}>
               These update the same editable draft — they do not replace preference-based generation.
             </Text>
             <PdfImportPanel onImported={handleImportMapped} />
-            {ocrText ? <Text style={styles.note}>OCR draft: {ocrText.slice(0, 80)}…</Text> : null}
-            {ocrNotice ? <Text style={styles.note}>{ocrNotice}</Text> : null}
+            {ocrText ? (
+              <Text style={[styles.note, { color: c.textSecondary }]}>OCR draft: {ocrText.slice(0, 80)}…</Text>
+            ) : null}
+            {ocrNotice ? <Text style={[styles.note, { color: c.textSecondary }]}>{ocrNotice}</Text> : null}
             <VoiceCaptureIndicator listening={listening} partial={partial} onToggle={toggleVoice} />
-            <Text style={styles.engine}>Voice engine: {getWhisperEngineName()}</Text>
-            {parseError ? <Text style={styles.error}>{parseError}</Text> : null}
-            <Pressable style={styles.secondary} onPress={addBlankExercise}>
-              <Text style={styles.secondaryText}>Add exercise manually</Text>
+            <Text style={[styles.engine, { color: c.textMuted }]}>Voice engine: {getWhisperEngineName()}</Text>
+            {parseError ? <Text style={[styles.error, { color: c.textDanger }]}>{parseError}</Text> : null}
+            <Pressable style={[styles.secondary, { borderColor: c.primary }]} onPress={addBlankExercise}>
+              <Text style={[styles.secondaryText, { color: c.textSuccess }]}>Add exercise manually</Text>
             </Pressable>
           </View>
         ) : null}
@@ -318,66 +342,56 @@ export default function WorkoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: semantic.surface },
+  root: { flex: 1 },
   container: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 },
-  title: { fontSize: typography.fontSize.xl, fontWeight: "700", color: semantic.textPrimary },
-  subtitle: { fontSize: typography.fontSize.sm, color: semantic.textMuted },
+  title: { fontSize: typography.fontSize.xl, fontWeight: "700" },
+  subtitle: { fontSize: typography.fontSize.sm },
   heroCard: {
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.lg,
-    backgroundColor: semantic.surfaceMuted,
     borderWidth: 1,
-    borderColor: semantic.border,
   },
-  section: { fontSize: typography.fontSize.md, fontWeight: "700", color: semantic.textPrimary },
-  prefs: { fontSize: typography.fontSize.sm, color: semantic.textSecondary },
-  hint: { fontSize: typography.fontSize.sm, color: semantic.textMuted },
-  note: { fontSize: typography.fontSize.sm, color: semantic.textSecondary },
-  routineTitle: { fontWeight: "700", color: palette.emeraldDark, fontSize: typography.fontSize.md },
-  engine: { fontSize: typography.fontSize.xs, color: semantic.textMuted },
+  section: { fontSize: typography.fontSize.md, fontWeight: "700" },
+  prefs: { fontSize: typography.fontSize.sm },
+  hint: { fontSize: typography.fontSize.sm },
+  note: { fontSize: typography.fontSize.sm },
+  routineTitle: { fontWeight: "700", fontSize: typography.fontSize.md },
+  engine: { fontSize: typography.fontSize.xs },
   primary: {
     minHeight: touchTarget.minHeight,
-    backgroundColor: palette.emerald,
     borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryText: { color: semantic.textOnPrimary, fontWeight: "700" },
+  primaryText: { fontWeight: "700" },
   secondary: {
     minHeight: touchTarget.minHeight,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: palette.emerald,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.md,
   },
-  secondaryText: { color: palette.emeraldDark, fontWeight: "700", textAlign: "center" },
+  secondaryText: { fontWeight: "700", textAlign: "center" },
   disabled: { opacity: 0.6 },
-  error: { color: semantic.textDanger, fontSize: typography.fontSize.sm },
+  error: { fontSize: typography.fontSize.sm },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: semantic.border,
     borderRadius: radii.md,
     padding: spacing.sm,
-    color: semantic.inputText,
-    backgroundColor: semantic.inputBg,
     minHeight: touchTarget.minHeight,
   },
   small: {
     width: 56,
     borderWidth: 1,
-    borderColor: semantic.border,
     borderRadius: radii.md,
     padding: spacing.sm,
     textAlign: "center",
-    color: semantic.inputText,
-    backgroundColor: semantic.inputBg,
     minHeight: touchTarget.minHeight,
   },
-  times: { color: semantic.textSecondary },
+  times: {},
   manageBox: { gap: spacing.md, paddingTop: spacing.sm },
 });

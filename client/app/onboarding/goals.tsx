@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { OnboardingStepLayout } from '@/components/quilore/OnboardingStepLayout';
-import { palette, radii, spacing, touchTarget } from '@/constants/DesignTokens';
+import { SelectionChip } from '@/components/quilore/SelectionChip';
+import { spacing } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 import { fetchProfile, saveGoal } from '@/lib/api/profile';
 import { clearOnboardingDraft, getOnboardingDraft, saveOnboardingDraft } from '@/lib/onboarding/storage';
 import { recalculateMacroTargets } from '@/lib/nutrition/macroTargets';
@@ -14,6 +16,7 @@ const TONES = ['direct', 'supportive', 'detailed'] as const;
 const SECONDARY = ['strength', 'mobility', 'endurance', 'nutrition_focus'] as const;
 
 export default function OnboardingGoalsScreen() {
+  const c = useThemeColors();
   const { user, markOnboardingComplete } = useAuth();
   const [primaryGoal, setPrimaryGoal] = useState<(typeof GOALS)[number]>('recomp');
   const [coachingTone, setCoachingTone] = useState<(typeof TONES)[number]>('supportive');
@@ -83,58 +86,49 @@ export default function OnboardingGoalsScreen() {
       onNext={finish}
       nextDisabled={busy}
       nextLabel={busy ? 'Finishing…' : 'Enter Quilore'}>
-      <Text style={styles.label}>Primary goal</Text>
+      <Text style={[styles.label, { color: c.textPrimary }]}>Primary goal</Text>
       <View style={styles.wrap}>
         {GOALS.map((g) => (
-          <Pressable
+          <SelectionChip
             key={g}
-            style={[styles.chip, primaryGoal === g && styles.chipOn]}
-            onPress={() => setPrimaryGoal(g)}>
-            <Text style={styles.chipText}>{g.replace('_', ' ')}</Text>
-          </Pressable>
+            label={g.replace('_', ' ')}
+            selected={primaryGoal === g}
+            onPress={() => setPrimaryGoal(g)}
+          />
         ))}
       </View>
 
-      <Text style={styles.label}>Coaching tone</Text>
+      <Text style={[styles.label, { color: c.textPrimary }]}>Coaching tone</Text>
       <View style={styles.wrap}>
         {TONES.map((t) => (
-          <Pressable
+          <SelectionChip
             key={t}
-            style={[styles.chip, coachingTone === t && styles.chipOn]}
-            onPress={() => setCoachingTone(t)}>
-            <Text style={styles.chipText}>{t}</Text>
-          </Pressable>
+            label={t}
+            selected={coachingTone === t}
+            onPress={() => setCoachingTone(t)}
+          />
         ))}
       </View>
 
-      <Text style={styles.label}>Secondary preferences (optional)</Text>
+      <Text style={[styles.label, { color: c.textPrimary }]}>Secondary preferences (optional)</Text>
       <View style={styles.wrap}>
         {SECONDARY.map((s) => (
-          <Pressable
+          <SelectionChip
             key={s}
-            style={[styles.chip, secondaryPrefs.includes(s) && styles.chipOn]}
-            onPress={() => toggleSecondary(s)}>
-            <Text style={styles.chipText}>{s.replace('_', ' ')}</Text>
-          </Pressable>
+            label={s.replace('_', ' ')}
+            selected={secondaryPrefs.includes(s)}
+            onPress={() => toggleSecondary(s)}
+          />
         ))}
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: c.textDanger }]}>{error}</Text> : null}
     </OnboardingStepLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  label: { fontWeight: '700', color: palette.gray800, marginTop: spacing.xs },
+  label: { fontWeight: '700', marginTop: spacing.xs },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: {
-    minHeight: touchTarget.minHeight,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.full,
-    backgroundColor: palette.gray200,
-    justifyContent: 'center',
-  },
-  chipOn: { backgroundColor: palette.emeraldLight },
-  chipText: { fontWeight: '700', color: palette.gray800, textTransform: 'capitalize' },
-  error: { color: palette.red, fontWeight: '600' },
+  error: { fontWeight: '600' },
 });

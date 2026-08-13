@@ -1,24 +1,31 @@
 /**
  * Quilore Design System Tokens
  *
- * Based on docs/quilore_document_set.md §4 — Design System.
- * High-contrast, large-touch-target UI for use mid-workout.
+ * High-contrast, large-touch-target UI for mid-workout use (docs §4).
+ * Prefer `themes.light` / `themes.dark` (or `useThemeColors`) over raw palette.
  */
 
-// ─── Colors ─────────────────────────────────────────────────
+// ─── Palette (raw swatches) ─────────────────────────────────
 export const palette = {
-  // Primary
-  emerald: '#10B981',
+  // Primary — darker fills for WCAG AA white-on-primary (≥4.5:1)
+  emerald: '#047857', // primary CTA fill / text on light
+  emeraldMid: '#059669',
   emeraldLight: '#34D399',
-  emeraldDark: '#059669',
+  emeraldSoft: '#D1FAE5',
+  emeraldDark: '#065F46',
 
   // Accent
-  amber: '#F59E0B',
+  amber: '#B45309', // text-safe on light
+  amberFill: '#D97706',
   amberLight: '#FBBF24',
+  amberSoft: '#FEF3C7',
 
   // Feedback
-  red: '#EF4444',
-  blue: '#3B82F6',
+  red: '#B91C1C', // text-safe danger on light
+  redFill: '#DC2626', // button fill with white text
+  redSoft: '#FEE2E2',
+  blue: '#1D4ED8', // link text
+  blueLight: '#93C5FD',
 
   // Neutrals
   white: '#FFFFFF',
@@ -35,25 +42,117 @@ export const palette = {
   black: '#000000',
 } as const;
 
-/** Semantic colors — prefer these over raw palette for text/surfaces. */
-export const semantic = {
-  textPrimary: palette.gray900,
-  textSecondary: palette.gray600,
-  textMuted: palette.gray500,
-  textOnPrimary: palette.white,
-  textOnUserBubble: palette.white,
-  textDanger: palette.red,
-  textWarning: palette.amber,
-  textLink: palette.blue,
-  surface: palette.white,
-  surfaceMuted: palette.gray50,
-  surfaceInverse: palette.gray900,
-  border: palette.gray200,
-  inputBg: palette.white,
-  inputText: palette.gray900,
-  inputPlaceholder: palette.gray400,
-  confirmSoft: '#D1FAE5',
-} as const;
+export type ThemeColors = {
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  textOnPrimary: string;
+  textOnUserBubble: string;
+  textDanger: string;
+  textWarning: string;
+  textLink: string;
+  textSuccess: string;
+  surface: string;
+  surfaceMuted: string;
+  surfaceInverse: string;
+  surfaceElevated: string;
+  border: string;
+  borderStrong: string;
+  inputBg: string;
+  inputText: string;
+  inputPlaceholder: string;
+  primary: string;
+  primaryMuted: string;
+  primarySoft: string;
+  danger: string;
+  dangerFill: string;
+  chipBg: string;
+  chipBgSelected: string;
+  chipText: string;
+  chipTextSelected: string;
+  userBubble: string;
+  coachBubble: string;
+  confirmSoft: string;
+  tabIconDefault: string;
+  tabIconSelected: string;
+  overlay: string;
+};
+
+export const themes: { light: ThemeColors; dark: ThemeColors } = {
+  light: {
+    textPrimary: palette.gray900,
+    textSecondary: palette.gray700,
+    textMuted: palette.gray600,
+    textOnPrimary: palette.white,
+    textOnUserBubble: palette.white,
+    textDanger: palette.red,
+    textWarning: palette.amber,
+    textLink: palette.blue,
+    textSuccess: palette.emerald,
+    surface: palette.white,
+    surfaceMuted: palette.gray50,
+    surfaceInverse: palette.gray900,
+    surfaceElevated: palette.white,
+    border: palette.gray300,
+    borderStrong: palette.gray400,
+    inputBg: palette.white,
+    inputText: palette.gray900,
+    inputPlaceholder: palette.gray500,
+    primary: palette.emerald,
+    primaryMuted: palette.emeraldMid,
+    primarySoft: palette.emeraldSoft,
+    danger: palette.red,
+    dangerFill: palette.redFill,
+    chipBg: palette.gray200,
+    chipBgSelected: palette.emeraldSoft,
+    chipText: palette.gray800,
+    chipTextSelected: palette.emeraldDark,
+    userBubble: palette.emerald,
+    coachBubble: palette.gray100,
+    confirmSoft: palette.emeraldSoft,
+    tabIconDefault: palette.gray500,
+    tabIconSelected: palette.emerald,
+    overlay: 'rgba(17, 24, 39, 0.55)',
+  },
+  dark: {
+    textPrimary: palette.gray50,
+    textSecondary: palette.gray300,
+    textMuted: palette.gray400,
+    textOnPrimary: palette.white,
+    textOnUserBubble: palette.white,
+    textDanger: '#FCA5A5',
+    textWarning: '#FCD34D',
+    textLink: palette.blueLight,
+    textSuccess: palette.emeraldLight,
+    surface: palette.gray900,
+    surfaceMuted: palette.gray800,
+    surfaceInverse: palette.gray50,
+    surfaceElevated: '#1F2937',
+    border: palette.gray700,
+    borderStrong: palette.gray600,
+    inputBg: palette.gray800,
+    inputText: palette.gray50,
+    inputPlaceholder: palette.gray400,
+    primary: '#059669',
+    primaryMuted: palette.emeraldLight,
+    primarySoft: '#064E3B',
+    danger: '#FCA5A5',
+    dangerFill: palette.redFill,
+    chipBg: palette.gray700,
+    chipBgSelected: '#064E3B',
+    chipText: palette.gray100,
+    chipTextSelected: palette.emeraldLight,
+    userBubble: '#047857',
+    coachBubble: palette.gray800,
+    confirmSoft: '#064E3B',
+    tabIconDefault: palette.gray500,
+    tabIconSelected: palette.emeraldLight,
+    overlay: 'rgba(0, 0, 0, 0.65)',
+  },
+};
+
+/** @deprecated Prefer themes.light / useThemeColors() — light-only snapshot for legacy imports. */
+export const semantic: ThemeColors = themes.light;
 
 // ─── Spacing (4px base grid) ────────────────────────────────
 export const spacing = {
