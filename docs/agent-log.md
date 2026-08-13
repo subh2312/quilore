@@ -3,7 +3,7 @@
 - **Date:** 2026-08-13
 - **Tool:** cursor
 - **Branch:** cursor-eas-observe-b3f3
-- **PR:** (pending)
+- **PR:** https://github.com/subh2312/quilore/pull/14
 - **What:** Wired EAS Observe (`expo-observe`) into the Expo Router app — `ObserveRoot`, `markInteractive`, expo-router integration; preview EAS env points at Cloudflare UAT URL.
 - **Why:** Collect startup/route performance & stability metrics for `@sm1523devs-team/quilore` gym UAT builds.
 - **How:** SDK 57 APIs (`ObserveRoot` / `useObserve`); configure `integrations['expo-router']` before mount; mark interactive after splash+auth and on login/signup/welcome/tabs landing screens.
