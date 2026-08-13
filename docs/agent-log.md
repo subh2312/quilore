@@ -2,8 +2,17 @@
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
+- **Branch:** cursor-fix-deploy-ssh-key-b3f3
+- **PR:** https://github.com/subh2312/quilore/pull/12
+- **What:** Pi deploy: validate `DEPLOY_SSH_KEY` + SSH smoke test; fix git fetch auth to Basic `x-access-token` (Bearer was failing on the Pi).
+- **Why:** After key aligned, deploy still failed: `fatal: could not read Username for 'https://github.com'` during remote `git fetch`.
+- **How:** Match `actions/checkout` auth (`AUTHORIZATION: basic` base64 of `x-access-token:TOKEN`); keep SSH fingerprint gate from earlier in this PR.
+
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
 - **Branch:** cursor-fix-pi-deploy-cloudflared-b3f3
-- **PR:** (pending)
+- **PR:** https://github.com/subh2312/quilore/pull/11
 - **What:** Clarified/fixed Pi deploy job: cloudflared install is for the GitHub Actions runner (SSH via tunnel), not the Pi; pinned 2026.7.3 with retries after release CDN 503.
 - **Why:** Merge deploy failed at "Install cloudflared" with HTTP 503; Pi already has the tunnel connector.
 - **How:** Skip if present; retry downloads; document runner-vs-Pi; arm64 images from failed run already published — re-run deploy after merge.
