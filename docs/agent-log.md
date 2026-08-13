@@ -2,6 +2,14 @@
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
+- **Branch:** cursor-eas-observe-b3f3
+- **PR:** https://github.com/subh2312/quilore/pull/14
+- **What:** EAS Observe + WatermelonDB Babel fix; EAS GitHub/Workflows for preview APK (`image: latest`, `client/.eas/workflows/*`, projectId, docs).
+- **Why:** Enable Observe metrics and unbreak EAS Bundle JS; connect Expo↔GitHub for label builds and automated preview APK on `dev` client changes.
+- **How:** ObserveRoot/markInteractive/expo-router integration; `declare` + flow-strip-types `allowDeclareFields`; workflows next to `eas.json` under `client/` (Expo base directory `client`).
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
 - **Branch:** cursor-fix-exercise-revisions-snapshot-jsonb-b3f3
 - **PR:** https://github.com/subh2312/quilore/pull/13
 - **What:** Map `exercise_revisions.snapshot` and `subscription_receipts.raw_payload` as JSONB via `@JdbcTypeCode(SqlTypes.JSON)` (were varchar in JPA).

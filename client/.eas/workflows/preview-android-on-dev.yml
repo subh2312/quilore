@@ -1,0 +1,24 @@
+# Auto-build gym UAT APK when client code lands on `dev`.
+# Paths filter keeps backend/ai-only merges from burning EAS minutes.
+#
+# Manual: `cd client && eas workflow:run .eas/workflows/preview-android-on-dev.yml`
+# Skip: include `[eas skip]`, `[skip eas]`, or `[no eas]` in the commit message.
+
+name: Preview Android APK on dev
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - client/**
+      - '!client/**/*.md'
+      - '!docs/**'
+
+jobs:
+  build_android_preview:
+    name: Build Android preview APK
+    type: build
+    params:
+      platform: android
+      profile: preview

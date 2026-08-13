@@ -4,8 +4,10 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { AuthScreenLayout } from '@/components/quilore/AuthScreenLayout';
 import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
 import { useAuth } from '@/context/AuthContext';
+import { useMarkObserveInteractive } from '@/hooks/useMarkObserveInteractive';
 
 export default function SignUpScreen() {
+  useMarkObserveInteractive();
   const { signUp } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');

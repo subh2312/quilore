@@ -7,15 +7,23 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "image": "latest"
+      },
+      "ios": {
+        "image": "latest"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.1.100:8080"
+        "EXPO_PUBLIC_API_URL": "https://quilore.sm4devlabs.dpdns.org"
       }
     },
     "production": {
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "image": "latest"
+      },
+      "ios": {
+        "image": "latest"
       }
     }
   },
