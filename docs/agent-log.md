@@ -4,9 +4,9 @@
 - **Tool:** cursor
 - **Branch:** cursor-eas-observe-b3f3
 - **PR:** https://github.com/subh2312/quilore/pull/14
-- **What:** Wired EAS Observe (`expo-observe`) into the Expo Router app — `ObserveRoot`, `markInteractive`, expo-router integration; preview EAS env points at Cloudflare UAT URL.
-- **Why:** Collect startup/route performance & stability metrics for `@sm1523devs-team/quilore` gym UAT builds.
-- **How:** SDK 57 APIs (`ObserveRoot` / `useObserve`); configure `integrations['expo-router']` before mount; mark interactive after splash+auth and on login/signup/welcome/tabs landing screens.
+- **What:** Wired EAS Observe; fixed Android EAS preview Bundle JS failure (WatermelonDB decorators + Babel).
+- **Why:** Build `194eae70…` failed on Bundle JavaScript: `Definitely assigned fields cannot be initialized here` in `lib/offline/models.ts`.
+- **How:** Use TypeScript `declare` on WM model fields + `@babel/plugin-transform-flow-strip-types` with `allowDeclareFields`; verified with `npx expo export --platform android`.
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
