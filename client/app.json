@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.sm4devlabs.quilore"
     },
     "web": {
       "bundler": "metro",
@@ -36,11 +37,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "68ee4a84-34f9-48a8-9ac9-8371d83973be"
-      }
     }
   }
 }
