@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { palette, radii, semantic, spacing, typography, touchTarget } from '@/constants/DesignTokens';
 
 export type ConfirmItem = { id: string; label: string; confirmed: boolean };
 
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   aiBadge: { fontSize: typography.fontSize.xs, color: palette.emeraldDark, fontWeight: '700' },
-  prompt: { fontSize: typography.fontSize.md, color: palette.gray800 },
+  prompt: { fontSize: typography.fontSize.md, color: semantic.textPrimary },
   item: {
     minHeight: touchTarget.minHeight,
     justifyContent: 'center',
@@ -52,8 +52,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     backgroundColor: palette.gray100,
   },
-  itemOn: { backgroundColor: '#D1FAE5' },
-  itemText: { fontSize: typography.fontSize.md, color: palette.gray800 },
+  itemOn: { backgroundColor: semantic.confirmSoft },
+  itemText: { fontSize: typography.fontSize.md, color: semantic.textPrimary },
   cta: {
     minHeight: touchTarget.minHeight,
     backgroundColor: palette.emerald,
@@ -61,5 +61,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { color: palette.white, fontWeight: '700', fontSize: typography.fontSize.md },
+  ctaText: { color: semantic.textOnPrimary, fontWeight: '700', fontSize: typography.fontSize.md },
 });

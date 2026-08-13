@@ -3,8 +3,9 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { OnboardingStepLayout } from '@/components/quilore/OnboardingStepLayout';
 import { palette, radii, spacing, touchTarget } from '@/constants/DesignTokens';
-import { saveGoal } from '@/lib/api/profile';
+import { fetchProfile, saveGoal } from '@/lib/api/profile';
 import { clearOnboardingDraft, getOnboardingDraft, saveOnboardingDraft } from '@/lib/onboarding/storage';
+import { recalculateMacroTargets } from '@/lib/nutrition/macroTargets';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/context/AuthContext';
 
@@ -49,6 +50,17 @@ export default function OnboardingGoalsScreen() {
         secondaryPrefs,
         schedulePrefs: { daysPerWeek: 4 },
       });
+      const profile = await fetchProfile(user.id);
+      if (profile?.weightKg && profile.heightCm && profile.age && profile.sex) {
+        await recalculateMacroTargets(user.id, {
+          primaryGoal,
+          weightKg: profile.weightKg,
+          heightCm: profile.heightCm,
+          age: profile.age,
+          sex: profile.sex,
+          activityLevel: 'moderate',
+        });
+      }
       track('goal_set', { primaryGoal, coachingTone, source: 'onboarding' });
       track('onboarding_completed', { step: 'goals' });
       await markOnboardingComplete();

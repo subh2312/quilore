@@ -35,6 +35,26 @@ export const palette = {
   black: '#000000',
 } as const;
 
+/** Semantic colors — prefer these over raw palette for text/surfaces. */
+export const semantic = {
+  textPrimary: palette.gray900,
+  textSecondary: palette.gray600,
+  textMuted: palette.gray500,
+  textOnPrimary: palette.white,
+  textOnUserBubble: palette.white,
+  textDanger: palette.red,
+  textWarning: palette.amber,
+  textLink: palette.blue,
+  surface: palette.white,
+  surfaceMuted: palette.gray50,
+  surfaceInverse: palette.gray900,
+  border: palette.gray200,
+  inputBg: palette.white,
+  inputText: palette.gray900,
+  inputPlaceholder: palette.gray400,
+  confirmSoft: '#D1FAE5',
+} as const;
+
 // ─── Spacing (4px base grid) ────────────────────────────────
 export const spacing = {
   xs: 4,

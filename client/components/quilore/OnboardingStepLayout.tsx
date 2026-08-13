@@ -1,7 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
+import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { palette, radii, semantic, spacing, typography, touchTarget } from '@/constants/DesignTokens';
 
 type OnboardingStepLayoutProps = {
   title: string;
@@ -28,44 +29,57 @@ export function OnboardingStepLayout({
 }: OnboardingStepLayoutProps) {
   return (
     <SafeAreaView style={styles.safe}>
-      <Animated.View
-        entering={FadeInRight.duration(320)}
-        exiting={FadeOutLeft.duration(220)}
-        style={styles.container}>
-        <Text style={styles.progress}>
-          Step {step} of {totalSteps}
-        </Text>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-        <View style={styles.body}>{children}</View>
-        <View style={styles.actions}>
-          {onBack ? (
-            <Pressable style={styles.secondary} onPress={onBack} accessibilityRole="button">
-              <Text style={styles.secondaryText}>Back</Text>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
+        <Animated.View
+          entering={FadeInRight.duration(320)}
+          exiting={FadeOutLeft.duration(220)}
+          style={styles.container}>
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag">
+            <Text style={styles.progress}>
+              Step {step} of {totalSteps}
+            </Text>
+            <Text style={styles.title}>{title}</Text>
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            <View style={styles.body}>{children}</View>
+          </ScrollView>
+          <View style={styles.actions}>
+            {onBack ? (
+              <Pressable style={styles.secondary} onPress={onBack} accessibilityRole="button">
+                <Text style={styles.secondaryText}>Back</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.spacer} />
+            )}
+            <Pressable
+              style={[styles.primary, nextDisabled && styles.disabled]}
+              disabled={nextDisabled}
+              onPress={onNext}
+              accessibilityRole="button">
+              <Text style={styles.primaryText}>{nextLabel}</Text>
             </Pressable>
-          ) : (
-            <View style={styles.spacer} />
-          )}
-          <Pressable
-            style={[styles.primary, nextDisabled && styles.disabled]}
-            disabled={nextDisabled}
-            onPress={onNext}
-            accessibilityRole="button">
-            <Text style={styles.primaryText}>{nextLabel}</Text>
-          </Pressable>
-        </View>
-      </Animated.View>
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: palette.white },
+  safe: { flex: 1, backgroundColor: semantic.surface },
+  flex: { flex: 1 },
   container: { flex: 1, padding: spacing.lg, gap: spacing.md },
+  scrollContent: { flexGrow: 1, gap: spacing.md, paddingBottom: spacing.md },
   progress: { color: palette.emeraldDark, fontWeight: '700', fontSize: typography.fontSize.sm },
-  title: { fontSize: typography.fontSize.xl, fontWeight: '800', color: palette.gray900 },
-  subtitle: { color: palette.gray600, fontSize: typography.fontSize.md, lineHeight: 22 },
-  body: { flex: 1, gap: spacing.md },
+  title: { fontSize: typography.fontSize.xl, fontWeight: '800', color: semantic.textPrimary },
+  subtitle: { color: semantic.textSecondary, fontSize: typography.fontSize.md, lineHeight: 22 },
+  body: { gap: spacing.md },
   actions: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   spacer: { flex: 1 },
   primary: {
@@ -76,7 +90,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: { color: palette.white, fontWeight: '800', fontSize: typography.fontSize.md },
+  primaryText: { color: semantic.textOnPrimary, fontWeight: '800', fontSize: typography.fontSize.md },
   secondary: {
     flex: 1,
     minHeight: touchTarget.minHeight,

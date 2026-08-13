@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { palette, radii, semantic, spacing, typography, touchTarget } from '@/constants/DesignTokens';
 
 export type MealLine = {
   id: string;
@@ -18,14 +18,19 @@ export type MealLine = {
 
 const UNITS = ['g', 'roti', 'katori', 'bowl', 'cup', 'tbsp', 'tsp', 'piece'];
 
+function emptyLine(): MealLine {
+  return { id: String(Date.now()), foodName: '', amount: '100', unit: 'g' };
+}
+
 export function ManualMealComposer({
   onSave,
+  initialLines,
 }: {
   onSave: (lines: MealLine[]) => void;
+  /** Optional seed — defaults to one blank line (never a demo dish). */
+  initialLines?: MealLine[];
 }) {
-  const [lines, setLines] = useState<MealLine[]>([
-    { id: '1', foodName: 'Dalma', amount: '1', unit: 'katori' },
-  ]);
+  const [lines, setLines] = useState<MealLine[]>(initialLines?.length ? initialLines : [emptyLine()]);
 
   const canSave = useMemo(
     () => lines.length > 0 && lines.every((l) => l.foodName.trim() && Number(l.amount) > 0),
@@ -37,14 +42,11 @@ export function ManualMealComposer({
   }
 
   function addLine() {
-    setLines((prev) => [
-      ...prev,
-      { id: String(Date.now()), foodName: '', amount: '100', unit: 'g' },
-    ]);
+    setLines((prev) => [...prev, emptyLine()]);
   }
 
   function removeLine(id: string) {
-    setLines((prev) => prev.filter((l) => l.id !== id));
+    setLines((prev) => (prev.length <= 1 ? [emptyLine()] : prev.filter((l) => l.id !== id)));
   }
 
   return (
@@ -55,7 +57,8 @@ export function ManualMealComposer({
         <View key={line.id} style={styles.line}>
           <TextInput
             style={styles.input}
-            placeholder="Food name"
+            placeholder="Food name (e.g. paratha)"
+            placeholderTextColor={semantic.inputPlaceholder}
             value={line.foodName}
             onChangeText={(foodName) => update(line.id, { foodName })}
           />
@@ -63,6 +66,7 @@ export function ManualMealComposer({
             <TextInput
               style={[styles.input, styles.amount]}
               keyboardType="decimal-pad"
+              placeholderTextColor={semantic.inputPlaceholder}
               value={line.amount}
               onChangeText={(amount) => update(line.id, { amount })}
             />
@@ -72,7 +76,7 @@ export function ManualMealComposer({
                   key={u}
                   onPress={() => update(line.id, { unit: u })}
                   style={[styles.unitChip, line.unit === u && styles.unitOn]}>
-                  <Text style={styles.unitText}>{u}</Text>
+                  <Text style={[styles.unitText, line.unit === u && styles.unitTextOn]}>{u}</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -97,22 +101,23 @@ export function ManualMealComposer({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
-  title: { fontSize: typography.fontSize.lg, fontWeight: '700', color: palette.gray900 },
-  hint: { fontSize: typography.fontSize.xs, color: palette.gray500 },
+  title: { fontSize: typography.fontSize.lg, fontWeight: '700', color: semantic.textPrimary },
+  hint: { fontSize: typography.fontSize.xs, color: semantic.textMuted },
   line: {
     gap: spacing.xs,
     padding: spacing.sm,
-    backgroundColor: palette.gray50,
+    backgroundColor: semantic.surfaceMuted,
     borderRadius: radii.md,
   },
   input: {
     minHeight: touchTarget.minHeight,
     borderWidth: 1,
-    borderColor: palette.gray200,
+    borderColor: semantic.border,
     borderRadius: radii.md,
     paddingHorizontal: spacing.sm,
-    backgroundColor: palette.white,
+    backgroundColor: semantic.inputBg,
     fontSize: typography.fontSize.md,
+    color: semantic.inputText,
   },
   row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   amount: { width: 72 },
@@ -125,9 +130,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     backgroundColor: palette.gray200,
   },
-  unitOn: { backgroundColor: palette.emeraldLight },
-  unitText: { fontWeight: '600', color: palette.gray800 },
-  remove: { color: palette.red, fontSize: typography.fontSize.sm },
+  unitOn: { backgroundColor: palette.emerald },
+  unitText: { fontWeight: '600', color: semantic.textPrimary },
+  unitTextOn: { color: semantic.textOnPrimary },
+  remove: { color: semantic.textDanger, fontSize: typography.fontSize.sm },
   secondary: {
     minHeight: touchTarget.minHeight,
     borderRadius: radii.md,
@@ -145,5 +151,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disabled: { opacity: 0.5 },
-  primaryText: { color: palette.white, fontWeight: '700' },
+  primaryText: { color: semantic.textOnPrimary, fontWeight: '700' },
 });

@@ -22,6 +22,7 @@ import {
   upsertProfile,
   type ProfileUpsertInput,
 } from '@/lib/api/profile';
+import { recalculateMacroTargets } from '@/lib/nutrition/macroTargets';
 import { useAuth } from '@/context/AuthContext';
 
 const GOALS = ['fat_loss', 'recomp', 'muscle_gain', 'maintain', 'performance'] as const;
@@ -144,8 +145,18 @@ export default function ProfileScreen() {
         secondaryPrefs,
         schedulePrefs: { daysPerWeek: 4 },
       });
+      const macros = await recalculateMacroTargets(user.id, {
+        primaryGoal,
+        weightKg: payload.weightKg,
+        heightCm: payload.heightCm,
+        age: payload.age,
+        sex: payload.sex,
+        activityLevel: 'moderate',
+      });
       track('goal_set', { primaryGoal, coachingTone, source: 'profile' });
-      setStatus('Profile and coaching preferences saved.');
+      setStatus(
+        `Profile saved. Macro targets updated for ${primaryGoal.replace('_', ' ')}: ${macros.targetCalories} kcal · P ${Math.round(macros.targetProteinG)}g / C ${Math.round(macros.targetCarbsG)}g / F ${Math.round(macros.targetFatG)}g.`,
+      );
     } catch (err) {
       setStatus(err instanceof Error ? err.message : 'Save failed — try again when online.');
     } finally {

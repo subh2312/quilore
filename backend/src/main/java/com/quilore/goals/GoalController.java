@@ -1,6 +1,9 @@
 package com.quilore.goals;
 
+import com.quilore.nutrition.MacroTargetService;
+import com.quilore.profile.ProfileMetricsService;
 import com.quilore.security.CurrentUser;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -9,7 +12,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,9 +24,17 @@ import java.util.UUID;
 public class GoalController {
 
     private final GoalService service;
+    private final ProfileMetricsService profileMetricsService;
+    private final MacroTargetService macroTargetService;
 
-    public GoalController(GoalService service) {
+    public GoalController(
+            GoalService service,
+            ProfileMetricsService profileMetricsService,
+            MacroTargetService macroTargetService
+    ) {
         this.service = service;
+        this.profileMetricsService = profileMetricsService;
+        this.macroTargetService = macroTargetService;
     }
 
     @PostMapping("/{userId}")
@@ -38,7 +51,31 @@ public class GoalController {
                 String.valueOf(body.getOrDefault("coachingTone", "supportive")),
                 schedule
         );
-        return ResponseEntity.ok(service.toMap(goal));
+        Map<String, Object> response = new LinkedHashMap<>(service.toMap(goal));
+        response.put("recalculationTriggered", false);
+        try {
+            var profile = profileMetricsService.getProfile(owner);
+            if (profile.weightKg() != null && profile.heightCm() != null
+                    && profile.age() != null && profile.sex() != null) {
+                var snapshot = macroTargetService.calculate(
+                        owner,
+                        goal.primaryGoal(),
+                        profile.weightKg(),
+                        profile.heightCm(),
+                        profile.age(),
+                        profile.sex(),
+                        "moderate"
+                );
+                response.put("macroTargets", macroTargetService.toMap(snapshot));
+                response.put("recalculationTriggered", true);
+            }
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode() != HttpStatus.NOT_FOUND) {
+                throw ex;
+            }
+            // Profile not set yet — goal saved; macros wait until baseline exists.
+        }
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{userId}/current")

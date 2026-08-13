@@ -77,7 +77,8 @@ public class GoalService {
         m.put("schedulePrefs", g.schedulePrefs());
         m.put("version", g.version());
         m.put("effectiveFrom", g.effectiveFrom().toString());
-        m.put("recalculationTriggered", true);
+        // Controller sets true after a successful macro recalculation when profile exists.
+        m.put("recalculationTriggered", false);
         return m;
     }
 }
