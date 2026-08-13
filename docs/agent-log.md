@@ -3,7 +3,7 @@
 - **Date:** 2026-08-13
 - **Tool:** cursor
 - **Branch:** cursor-fix-deploy-ssh-key-b3f3
-- **PR:** (pending)
+- **PR:** https://github.com/subh2312/quilore/pull/12
 - **What:** Pi deploy SSH step now validates `DEPLOY_SSH_KEY` and smoke-tests login; clearer failure when the GitHub secret doesn’t match Pi `authorized_keys`.
 - **Why:** After PR #11, cloudflared install succeeded but deploy failed with `Permission denied (publickey)` — tunnel OK, secret key mismatch/malformed paste.
 - **How:** Normalize literal `\n`, `ssh-keygen -y` gate, BatchMode SSH probe before deploy; instruct re-setting secret via `gh secret set DEPLOY_SSH_KEY < quilore-agent`.
