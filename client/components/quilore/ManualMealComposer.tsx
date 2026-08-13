@@ -7,7 +7,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { palette, radii, semantic, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 
 export type MealLine = {
   id: string;
@@ -27,9 +28,9 @@ export function ManualMealComposer({
   initialLines,
 }: {
   onSave: (lines: MealLine[]) => void;
-  /** Optional seed — defaults to one blank line (never a demo dish). */
   initialLines?: MealLine[];
 }) {
+  const c = useThemeColors();
   const [lines, setLines] = useState<MealLine[]>(initialLines?.length ? initialLines : [emptyLine()]);
 
   const canSave = useMemo(
@@ -51,49 +52,82 @@ export function ManualMealComposer({
 
   return (
     <View style={styles.wrap} accessibilityLabel="Manual meal composer">
-      <Text style={styles.title}>Manual meal</Text>
-      <Text style={styles.hint}>Indian household units supported — totals stay editable before save.</Text>
+      <Text style={[styles.title, { color: c.textPrimary }]}>Manual meal</Text>
+      <Text style={[styles.hint, { color: c.textMuted }]}>
+        Indian household units supported — totals stay editable before save.
+      </Text>
       {lines.map((line) => (
-        <View key={line.id} style={styles.line}>
+        <View key={line.id} style={[styles.line, { backgroundColor: c.surfaceMuted }]}>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              { borderColor: c.border, backgroundColor: c.inputBg, color: c.inputText },
+            ]}
             placeholder="Food name (e.g. paratha)"
-            placeholderTextColor={semantic.inputPlaceholder}
+            placeholderTextColor={c.inputPlaceholder}
             value={line.foodName}
             onChangeText={(foodName) => update(line.id, { foodName })}
           />
           <View style={styles.row}>
             <TextInput
-              style={[styles.input, styles.amount]}
+              style={[
+                styles.input,
+                styles.amount,
+                { borderColor: c.border, backgroundColor: c.inputBg, color: c.inputText },
+              ]}
               keyboardType="decimal-pad"
-              placeholderTextColor={semantic.inputPlaceholder}
+              placeholderTextColor={c.inputPlaceholder}
               value={line.amount}
               onChangeText={(amount) => update(line.id, { amount })}
+              accessibilityLabel="Amount"
             />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.units}>
-              {UNITS.map((u) => (
-                <Pressable
-                  key={u}
-                  onPress={() => update(line.id, { unit: u })}
-                  style={[styles.unitChip, line.unit === u && styles.unitOn]}>
-                  <Text style={[styles.unitText, line.unit === u && styles.unitTextOn]}>{u}</Text>
-                </Pressable>
-              ))}
+              {UNITS.map((u) => {
+                const on = line.unit === u;
+                return (
+                  <Pressable
+                    key={u}
+                    onPress={() => update(line.id, { unit: u })}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={`Unit ${u}`}
+                    style={[
+                      styles.unitChip,
+                      {
+                        backgroundColor: on ? c.primary : c.chipBg,
+                        borderColor: on ? c.primary : c.border,
+                      },
+                    ]}>
+                    <Text style={[styles.unitText, { color: on ? c.textOnPrimary : c.chipText }]}>{u}</Text>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
           </View>
-          <Pressable onPress={() => removeLine(line.id)} accessibilityRole="button">
-            <Text style={styles.remove}>Remove</Text>
+          <Pressable
+            onPress={() => removeLine(line.id)}
+            accessibilityRole="button"
+            style={styles.removeHit}
+            accessibilityLabel="Remove food line">
+            <Text style={[styles.remove, { color: c.textDanger }]}>Remove</Text>
           </Pressable>
         </View>
       ))}
-      <Pressable style={styles.secondary} onPress={addLine}>
-        <Text style={styles.secondaryText}>Add food</Text>
+      <Pressable
+        style={[styles.secondary, { borderColor: c.primary }]}
+        onPress={addLine}
+        accessibilityRole="button">
+        <Text style={[styles.secondaryText, { color: c.textSuccess }]}>Add food</Text>
       </Pressable>
       <Pressable
-        style={[styles.primary, !canSave && styles.disabled]}
+        style={[styles.primary, { backgroundColor: c.primary }, !canSave && styles.disabled]}
         disabled={!canSave}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !canSave }}
         onPress={() => onSave(lines)}>
-        <Text style={styles.primaryText}>Save meal</Text>
+        <Text style={[styles.primaryText, { color: c.textOnPrimary }]}>
+          {canSave ? 'Save meal' : 'Enter food name and amount'}
+        </Text>
       </Pressable>
     </View>
   );
@@ -101,55 +135,51 @@ export function ManualMealComposer({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
-  title: { fontSize: typography.fontSize.lg, fontWeight: '700', color: semantic.textPrimary },
-  hint: { fontSize: typography.fontSize.xs, color: semantic.textMuted },
+  title: { fontSize: typography.fontSize.lg, fontWeight: '700' },
+  hint: { fontSize: typography.fontSize.xs },
   line: {
     gap: spacing.xs,
     padding: spacing.sm,
-    backgroundColor: semantic.surfaceMuted,
     borderRadius: radii.md,
   },
   input: {
     minHeight: touchTarget.minHeight,
     borderWidth: 1,
-    borderColor: semantic.border,
     borderRadius: radii.md,
     paddingHorizontal: spacing.sm,
-    backgroundColor: semantic.inputBg,
     fontSize: typography.fontSize.md,
-    color: semantic.inputText,
   },
   row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   amount: { width: 72 },
   units: { flexGrow: 1 },
   unitChip: {
-    paddingHorizontal: spacing.sm,
-    minHeight: 36,
+    paddingHorizontal: spacing.md,
+    minHeight: touchTarget.minHeight,
+    minWidth: touchTarget.minWidth,
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: spacing.xs,
     borderRadius: radii.full,
-    backgroundColor: palette.gray200,
+    borderWidth: 1,
   },
-  unitOn: { backgroundColor: palette.emerald },
-  unitText: { fontWeight: '600', color: semantic.textPrimary },
-  unitTextOn: { color: semantic.textOnPrimary },
-  remove: { color: semantic.textDanger, fontSize: typography.fontSize.sm },
+  unitText: { fontWeight: '700' },
+  removeHit: { minHeight: touchTarget.minHeight, justifyContent: 'center' },
+  remove: { fontSize: typography.fontSize.sm, fontWeight: '600' },
   secondary: {
     minHeight: touchTarget.minHeight,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: palette.emerald,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryText: { color: palette.emeraldDark, fontWeight: '700' },
+  secondaryText: { fontWeight: '700' },
   primary: {
     minHeight: touchTarget.minHeight,
     borderRadius: radii.md,
-    backgroundColor: palette.emerald,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.md,
   },
-  disabled: { opacity: 0.5 },
-  primaryText: { color: semantic.textOnPrimary, fontWeight: '700' },
+  disabled: { opacity: 0.45 },
+  primaryText: { fontWeight: '700', textAlign: 'center' },
 });
