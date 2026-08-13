@@ -2,8 +2,16 @@
 
 - **Date:** 2026-08-13
 - **Tool:** cursor
-- **Branch:** cursor-fix-pi-deploy-cloudflared-b3f3
+- **Branch:** cursor-fix-deploy-ssh-key-b3f3
 - **PR:** (pending)
+- **What:** Pi deploy SSH step now validates `DEPLOY_SSH_KEY` and smoke-tests login; clearer failure when the GitHub secret doesn’t match Pi `authorized_keys`.
+- **Why:** After PR #11, cloudflared install succeeded but deploy failed with `Permission denied (publickey)` — tunnel OK, secret key mismatch/malformed paste.
+- **How:** Normalize literal `\n`, `ssh-keygen -y` gate, BatchMode SSH probe before deploy; instruct re-setting secret via `gh secret set DEPLOY_SSH_KEY < quilore-agent`.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-fix-pi-deploy-cloudflared-b3f3
+- **PR:** https://github.com/subh2312/quilore/pull/11
 - **What:** Clarified/fixed Pi deploy job: cloudflared install is for the GitHub Actions runner (SSH via tunnel), not the Pi; pinned 2026.7.3 with retries after release CDN 503.
 - **Why:** Merge deploy failed at "Install cloudflared" with HTTP 503; Pi already has the tunnel connector.
 - **How:** Skip if present; retry downloads; document runner-vs-Pi; arm64 images from failed run already published — re-run deploy after merge.
