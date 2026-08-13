@@ -67,14 +67,14 @@ export default function ProfileBaselineScreen() {
     await saveOnboardingDraft(user.id, payload);
     try {
       await upsertProfile(user.id, payload);
-      router.push('/onboarding/goals');
+      router.push('/onboarding/physique-current');
     } catch (err) {
       // Offline / unavailable: keep draft and continue. Hard failures stay on this step.
       const offline =
         err instanceof ApiClientError && (err.endpointUnavailable || err.status === 0);
       if (offline) {
         setError('Saved on this device — will sync when you are back online.');
-        router.push('/onboarding/goals');
+        router.push('/onboarding/physique-current');
       } else {
         setError(err instanceof Error ? err.message : 'Could not save baseline. Check your connection and try again.');
       }
@@ -88,7 +88,7 @@ export default function ProfileBaselineScreen() {
       title="Your baseline"
       subtitle="Coaching estimates use these inputs — you can update them anytime in Profile."
       step={3}
-      totalSteps={4}
+      totalSteps={7}
       onBack={() => router.back()}
       onNext={next}
       nextDisabled={!valid || busy}

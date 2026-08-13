@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { QuiloreLogo } from '@/components/quilore/QuiloreLogo';
-import { palette, radii, spacing, touchTarget, typography } from '@/constants/DesignTokens';
+import { radii, spacing, touchTarget, typography } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/context/AuthContext';
 import { useMarkObserveInteractive } from '@/hooks/useMarkObserveInteractive';
@@ -16,6 +17,7 @@ const VALUE_PROPS = [
 
 export default function OnboardingWelcomeScreen() {
   useMarkObserveInteractive();
+  const c = useThemeColors();
   const { signOut } = useAuth();
 
   useEffect(() => {
@@ -23,11 +25,13 @@ export default function OnboardingWelcomeScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: c.surfaceMuted }]}>
       <Animated.View entering={FadeInUp.duration(500)} style={styles.hero}>
         <QuiloreLogo size={112} />
-        <Text style={styles.title}>Welcome to Quilore</Text>
-        <Text style={styles.subtitle}>Your AI training partner — always editable, never final.</Text>
+        <Text style={[styles.title, { color: c.textPrimary }]}>Welcome to Quilore</Text>
+        <Text style={[styles.subtitle, { color: c.textSecondary }]}>
+          Your AI training partner — always editable, never final.
+        </Text>
       </Animated.View>
 
       <View style={styles.cards}>
@@ -35,19 +39,22 @@ export default function OnboardingWelcomeScreen() {
           <Animated.View
             key={item.title}
             entering={FadeInDown.delay(180 + index * 120).duration(420)}
-            style={styles.card}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardBody}>{item.body}</Text>
+            style={[styles.card, { backgroundColor: c.surfaceElevated, borderColor: c.border }]}>
+            <Text style={[styles.cardTitle, { color: c.textSuccess }]}>{item.title}</Text>
+            <Text style={[styles.cardBody, { color: c.textSecondary }]}>{item.body}</Text>
           </Animated.View>
         ))}
       </View>
 
       <Animated.View entering={FadeInUp.delay(600).duration(400)} style={styles.actions}>
-        <Pressable style={styles.primary} onPress={() => router.push('/onboarding/consent')} accessibilityRole="button">
-          <Text style={styles.primaryText}>Get started</Text>
+        <Pressable
+          style={[styles.primary, { backgroundColor: c.primary }]}
+          onPress={() => router.push('/onboarding/consent')}
+          accessibilityRole="button">
+          <Text style={[styles.primaryText, { color: c.textOnPrimary }]}>Get started</Text>
         </Pressable>
         <Pressable style={styles.secondary} onPress={() => void signOut()} accessibilityRole="button">
-          <Text style={styles.secondaryText}>Sign out</Text>
+          <Text style={[styles.secondaryText, { color: c.textMuted }]}>Sign out</Text>
         </Pressable>
       </Animated.View>
     </View>
@@ -57,7 +64,6 @@ export default function OnboardingWelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: palette.gray50,
     padding: spacing.lg,
     justifyContent: 'space-between',
   },
@@ -65,39 +71,34 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.fontSize.xxl,
     fontWeight: '800',
-    color: palette.gray900,
     textAlign: 'center',
   },
   subtitle: {
     textAlign: 'center',
-    color: palette.gray600,
     fontSize: typography.fontSize.md,
     lineHeight: 22,
     maxWidth: 320,
   },
   cards: { gap: spacing.md },
   card: {
-    backgroundColor: palette.white,
     borderRadius: radii.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: palette.gray200,
   },
-  cardTitle: { fontWeight: '800', color: palette.emeraldDark, fontSize: typography.fontSize.md },
-  cardBody: { marginTop: 4, color: palette.gray700, lineHeight: 20 },
+  cardTitle: { fontWeight: '800', fontSize: typography.fontSize.md },
+  cardBody: { marginTop: 4, lineHeight: 20 },
   actions: { paddingBottom: spacing.lg, gap: spacing.md },
   primary: {
     minHeight: touchTarget.minHeight + 6,
-    backgroundColor: palette.emerald,
     borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: { color: palette.white, fontWeight: '800', fontSize: typography.fontSize.lg },
+  primaryText: { fontWeight: '800', fontSize: typography.fontSize.lg },
   secondary: {
     minHeight: touchTarget.minHeight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryText: { color: palette.gray600, fontWeight: '700', fontSize: typography.fontSize.md },
+  secondaryText: { fontWeight: '700', fontSize: typography.fontSize.md },
 });

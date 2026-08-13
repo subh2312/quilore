@@ -24,7 +24,8 @@ import { appendPartial, getWhisperEngineName, startListening, stopListening } fr
 import { parseVoiceSet } from "@/lib/voice/parseVoiceSet";
 import { targetMuscleForExercise } from "@/lib/workout/exerciseTargets";
 import { exercisesToDraftRows } from "@/lib/workout/generateFromPreferences";
-import { upsertLocal } from "@/lib/offline/store";
+import { listLocal, upsertLocal } from "@/lib/offline/store";
+import { getOnboardingDraft } from "@/lib/onboarding/storage";
 import { track } from "@/lib/analytics";
 import { useAuth } from "@/context/AuthContext";
 import { useMarkObserveInteractive } from "@/hooks/useMarkObserveInteractive";
@@ -74,15 +75,41 @@ export default function WorkoutScreen() {
     setGenerating(true);
     setRoutineNote(null);
     try {
-      const [profile, goal] = await Promise.all([fetchProfile(user.id), fetchCurrentGoal(user.id)]);
+      const [profile, goal, draft] = await Promise.all([
+        fetchProfile(user.id),
+        fetchCurrentGoal(user.id),
+        getOnboardingDraft(user.id),
+      ]);
       const primaryGoal = goal.primaryGoal ?? "recomp";
       const daysPerWeek = Number(goal.schedulePrefs?.daysPerWeek ?? 4);
+      const schedule = goal.schedulePrefs ?? {};
+      const asStringList = (v: unknown): string[] =>
+        Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+      const currentPhysique = draft.currentPhysique?.length
+        ? draft.currentPhysique
+        : asStringList(schedule.currentPhysique);
+      const goalPhysique = draft.goalPhysique?.length
+        ? draft.goalPhysique
+        : asStringList(schedule.goalPhysique);
+      const healthConditions = draft.healthConditions?.length
+        ? draft.healthConditions
+        : asStringList(schedule.healthConditions);
+      const painRegions = draft.painRegions?.length
+        ? draft.painRegions
+        : asStringList(schedule.painRegions);
+      const triage = listLocal("plans").find((p) => p.id === "triage_modify");
+      const avoidRegions = Array.isArray(triage?.avoidRegions)
+        ? (triage?.avoidRegions as string[])
+        : [];
       const prompt = [
         `Generate a ${daysPerWeek}-day training routine`,
         `goal=${primaryGoal}`,
         `experience=${profile?.trainingExperience ?? "beginner"}`,
         `equipment=${profile?.equipmentAccess ?? "gym"}`,
+        goalPhysique.length ? `goal_physique=${goalPhysique.join(",")}` : null,
+        currentPhysique.length ? `current_physique=${currentPhysique.join(",")}` : null,
         profile?.injuriesInfo ? `injuries_risk_flag=${profile.injuriesInfo}` : null,
+        avoidRegions.length ? `avoid_regions=${avoidRegions.join(",")}` : null,
       ]
         .filter(Boolean)
         .join("; ");
@@ -96,7 +123,12 @@ export default function WorkoutScreen() {
           equipmentAccess: profile?.equipmentAccess,
           daysPerWeek,
           secondaryPrefs: goal.secondaryPrefs,
-          injuriesInfo: profile?.injuriesInfo,
+          injuriesInfo: profile?.injuriesInfo ?? draft.injuriesInfo,
+          currentPhysique,
+          goalPhysique,
+          healthConditions,
+          painRegions,
+          avoidRegions,
         },
       });
 

@@ -5,7 +5,7 @@ import { OnboardingStepLayout } from '@/components/quilore/OnboardingStepLayout'
 import { SelectionChip } from '@/components/quilore/SelectionChip';
 import { spacing } from '@/constants/DesignTokens';
 import { useThemeColors } from '@/hooks/useTheme';
-import { fetchProfile, saveGoal } from '@/lib/api/profile';
+import { fetchProfile, saveGoal, upsertProfile } from '@/lib/api/profile';
 import { clearOnboardingDraft, getOnboardingDraft, saveOnboardingDraft } from '@/lib/onboarding/storage';
 import { recalculateMacroTargets } from '@/lib/nutrition/macroTargets';
 import { track } from '@/lib/analytics';
@@ -47,13 +47,39 @@ export default function OnboardingGoalsScreen() {
     setError(null);
     await saveOnboardingDraft(user.id, { primaryGoal, coachingTone });
     try {
+      const draft = await getOnboardingDraft(user.id);
+      const profile = await fetchProfile(user.id);
+      if (profile) {
+        const injuriesBits = [
+          draft.injuriesInfo,
+          draft.currentPhysique?.length ? `Current physique: ${draft.currentPhysique.join(', ')}` : '',
+          draft.goalPhysique?.length ? `Goal physique: ${draft.goalPhysique.join(', ')}` : '',
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        await upsertProfile(user.id, {
+          age: profile.age,
+          sex: profile.sex,
+          heightCm: profile.heightCm,
+          weightKg: profile.weightKg,
+          trainingExperience: profile.trainingExperience,
+          dietaryPreferences: profile.dietaryPreferences,
+          equipmentAccess: profile.equipmentAccess,
+          injuriesInfo: injuriesBits || profile.injuriesInfo,
+        });
+      }
       await saveGoal(user.id, {
         primaryGoal,
         coachingTone,
         secondaryPrefs,
-        schedulePrefs: { daysPerWeek: 4 },
+        schedulePrefs: {
+          daysPerWeek: 4,
+          currentPhysique: draft.currentPhysique ?? [],
+          goalPhysique: draft.goalPhysique ?? [],
+          healthConditions: draft.healthConditions ?? [],
+          painRegions: draft.painRegions ?? [],
+        },
       });
-      const profile = await fetchProfile(user.id);
       if (profile?.weightKg && profile.heightCm && profile.age && profile.sex) {
         await recalculateMacroTargets(user.id, {
           primaryGoal,
@@ -80,8 +106,8 @@ export default function OnboardingGoalsScreen() {
     <OnboardingStepLayout
       title="Goals & coaching"
       subtitle="Targets are coaching estimates — reviewable, not medical prescriptions."
-      step={4}
-      totalSteps={4}
+      step={7}
+      totalSteps={7}
       onBack={() => router.back()}
       onNext={finish}
       nextDisabled={busy}

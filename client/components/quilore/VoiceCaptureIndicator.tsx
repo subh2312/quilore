@@ -22,13 +22,13 @@ export function VoiceCaptureIndicator({
         onPress={onToggle}
         accessibilityRole="button"
         accessibilityLabel="Voice capture">
-        <Text style={[styles.micText, { color: c.textOnPrimary }]}>
+        <Text style={[styles.micText, { color: c.textOnInverse }]}>
           {listening ? '● Listening' : '🎤 Voice log'}
         </Text>
       </Pressable>
       {listening || partial ? (
         <View style={[styles.overlay, { backgroundColor: c.surfaceInverse }]}>
-          <Text style={[styles.partial, { color: c.textOnPrimary }]}>{partial || '…'}</Text>
+          <Text style={[styles.partial, { color: c.textOnInverse }]}>{partial || '…'}</Text>
         </View>
       ) : null}
     </View>

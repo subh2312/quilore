@@ -48,6 +48,7 @@ export type ThemeColors = {
   textMuted: string;
   textOnPrimary: string;
   textOnUserBubble: string;
+  textOnInverse: string;
   textDanger: string;
   textWarning: string;
   textLink: string;
@@ -85,6 +86,7 @@ export const themes: { light: ThemeColors; dark: ThemeColors } = {
     textMuted: palette.gray600,
     textOnPrimary: palette.white,
     textOnUserBubble: palette.white,
+    textOnInverse: palette.white, // light theme: inverse surface is dark
     textDanger: palette.red,
     textWarning: palette.amber,
     textLink: palette.blue,
@@ -120,6 +122,7 @@ export const themes: { light: ThemeColors; dark: ThemeColors } = {
     textMuted: palette.gray400,
     textOnPrimary: palette.white,
     textOnUserBubble: palette.white,
+    textOnInverse: palette.gray900, // dark theme: inverse surface is light
     textDanger: '#FCA5A5',
     textWarning: '#FCD34D',
     textLink: palette.blueLight,

@@ -83,7 +83,7 @@ export default function ConsentOnboardingScreen() {
             style={[styles.back, { borderColor: c.border }]}>
             <Text style={[styles.backText, { color: c.textPrimary }]}>Back</Text>
           </Pressable>
-          <Text style={[styles.step, { color: c.textSuccess }]}>Step 2 of 4</Text>
+          <Text style={[styles.step, { color: c.textSuccess }]}>Step 2 of 7</Text>
           <Text style={[styles.title, { color: c.textPrimary }]}>Consent & privacy</Text>
           <Text style={[styles.body, { color: c.textSecondary }]}>
             Required terms must be accepted before onboarding continues. Medical-risk features are

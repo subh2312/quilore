@@ -16,6 +16,7 @@ import { SelectionChip } from '@/components/quilore/SelectionChip';
 import { radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
 import { useThemeColors } from '@/hooks/useTheme';
 import { fetchMe, isSupportOrAdmin } from '@/lib/api/auth';
+import { ApiClientError } from '@/lib/api/client';
 import { fetchEntitlements, mockPurchase, mockRestorePurchases } from '@/lib/api/billing';
 import { setAnalyticsConsent, track } from '@/lib/analytics';
 import { setCrashReportingEnabled } from '@/lib/crashReporting';
@@ -112,7 +113,13 @@ export default function ProfileScreen() {
         }
         if (goal.secondaryPrefs?.length) setSecondaryPrefs(goal.secondaryPrefs);
       } catch (err) {
-        if (active) setStatus(err instanceof Error ? err.message : 'Could not load profile.');
+        if (active) {
+          if (err instanceof ApiClientError && err.status === 401) {
+            setStatus('Session expired — sign out and sign in again.');
+          } else {
+            setStatus(err instanceof Error ? err.message : 'Could not load profile.');
+          }
+        }
       } finally {
         if (active) setProfileLoading(false);
       }
@@ -175,13 +182,22 @@ export default function ProfileScreen() {
 
   async function purchase() {
     setBillingBusy(true);
+    setStatus(null);
     try {
       const ent = await mockPurchase('premium_monthly');
       setPlan(ent.plan === 'PREMIUM' ? 'PREMIUM' : 'FREE');
       track('subscription_started', { productId: 'premium_monthly' });
-      setStatus('Subscription activated via mock IAP (UAT receipt).');
+      setStatus(
+        ent.plan === 'PREMIUM'
+          ? 'Premium activated (UAT). You can change this anytime.'
+          : 'Purchase completed — plan unchanged.',
+      );
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'Purchase failed');
+      if (err instanceof ApiClientError && err.status === 401) {
+        setStatus('Session expired — sign in again to manage purchases.');
+      } else {
+        setStatus(err instanceof Error ? err.message : 'Purchase failed');
+      }
     } finally {
       setBillingBusy(false);
     }
@@ -189,13 +205,22 @@ export default function ProfileScreen() {
 
   async function restore() {
     setBillingBusy(true);
+    setStatus(null);
     try {
       const ent = await mockRestorePurchases();
       setPlan(ent.plan === 'PREMIUM' ? 'PREMIUM' : 'FREE');
       track('subscription_restored', { productId: 'premium_monthly' });
-      setStatus('Purchases restored.');
+      setStatus(
+        ent.plan === 'PREMIUM'
+          ? 'Purchases restored — Premium is active.'
+          : 'No Premium purchase found to restore.',
+      );
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'Restore failed');
+      if (err instanceof ApiClientError && err.status === 401) {
+        setStatus('Session expired — sign in again to restore purchases.');
+      } else {
+        setStatus(err instanceof Error ? err.message : 'Restore failed');
+      }
     } finally {
       setBillingBusy(false);
     }
@@ -395,10 +420,21 @@ export default function ProfileScreen() {
           style={[styles.logout, { backgroundColor: c.surfaceInverse }]}
           onPress={handleLogout}
           accessibilityRole="button">
-          <Text style={[styles.logoutText, { color: c.textOnPrimary }]}>Log out</Text>
+          <Text style={[styles.logoutText, { color: c.textOnInverse }]}>Log out</Text>
         </Pressable>
 
-        {status ? <Text style={[styles.status, { color: c.textSecondary }]}>{status}</Text> : null}
+        {status ? (
+          <Text
+            style={[
+              styles.status,
+              {
+                color:
+                  /expired|failed|could not|error/i.test(status) ? c.textDanger : c.textSecondary,
+              },
+            ]}>
+            {status}
+          </Text>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );

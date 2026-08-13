@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor-ux-feedback-fixes-1811
 - **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Fix billing hang / logout auth errors / invisible dark-mode text; expand onboarding with physique photos+tags, goal physique, health/pain; triage uses recent workouts and can modify today’s routine; generation reads physique/health + avoidRegions.
+- **Why:** Premium stuck on Processing; “Authentication required” under Logout and broken re-login; screenshots showed unreadable text; users need physique/health inputs to drive plans; arm pain after legs must not look like DOMS.
+- **How:** Mock billing timeout + soft PREMIUM; themed login/logout (`textOnInverse`); always `clearStoredSession` on signOut; theme welcome/SessionSummary/PortionRange/admin/consent step; new onboarding screens; `triageContext` + muscle-map modify CTA; prefs/schedulePrefs persistence.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
 - **What:** Design-system execution: WCAG-safer primary/danger colors; real light/dark `themes` + `useThemeColors` across tabs/onboarding/shared UI; keyboard/scroll-safe onboarding; profile-baseline no longer advances on hard save failure; consent Back; 48px chips/units; reduced-motion; Quilore not-found/modal; scrubbed “Spring Boot” / causalClaim microcopy.
 - **Why:** Audit found tokens unused, broken dark mode, contrast fails, onboarding save bug, missing back on consent, sub-44px unit chips.
 - **How:** `themes.light/dark`, `useTheme`/`SelectionChip`, re-enable `userInterfaceStyle: automatic`, fix baseline `finally` navigation, theme wired screens/components, contrast Jest checks.

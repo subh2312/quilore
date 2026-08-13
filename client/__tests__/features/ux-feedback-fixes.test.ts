@@ -85,4 +85,38 @@ describe('Preference-based program generation', () => {
     const cutNames = cut.sessions.flatMap((s) => s.exercises.map((e) => e.name)).join(' ');
     expect(cutNames.toLowerCase()).toMatch(/finisher|bike|walk/);
   });
+
+  it('avoids pain regions and notes health conditions', () => {
+    const prog = generateProgramFromPreferences({
+      primaryGoal: 'recomp',
+      trainingExperience: 'intermediate',
+      equipmentAccess: 'gym',
+      daysPerWeek: 4,
+      goalPhysique: ['leaner', 'stronger'],
+      painRegions: ['knees'],
+      healthConditions: ['hypertension'],
+      avoidRegions: ['shoulders'],
+    });
+    const names = prog.activeSession.exercises.map((e) => e.name.toLowerCase()).join(' ');
+    expect(names).not.toMatch(/back squat|overhead press|bench press/);
+    expect(names).toMatch(/pain-aware|mobility|health-aware|rpe/);
+  });
+});
+
+describe('Triage recent training context', () => {
+  it('flags arm pain after legs as not training soreness', () => {
+    const { triageInterpretation } = require('../../lib/workout/triageContext') as typeof import('../../lib/workout/triageContext');
+    const result = triageInterpretation({
+      regionId: 'shoulders',
+      descriptors: ['sore', 'aching'],
+      recent: {
+        recentExerciseNames: ['Back Squat', 'Romanian Deadlift'],
+        recentMuscles: ['quads', 'hamstrings'],
+        regionRecentlyTrained: false,
+        summary: 'Recent sessions (72h): Back Squat, Romanian Deadlift',
+      },
+    });
+    expect(result.flag).toBe('NOT_TRAINING_SORENESS');
+    expect(result.suggestModifyWorkout).toBe(true);
+  });
 });

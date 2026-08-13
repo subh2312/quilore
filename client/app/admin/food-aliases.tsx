@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { palette, radii, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { radii, spacing, typography, touchTarget } from "@/constants/DesignTokens";
+import { useThemeColors } from "@/hooks/useTheme";
 import { listFoodAliases, submitFoodAlias } from "@/lib/api/admin";
 import type { FoodAlias } from "@/lib/api/types";
 
 export default function FoodAliasesAdminScreen() {
+  const c = useThemeColors();
   const [rows, setRows] = useState<FoodAlias[]>([]);
   const [loading, setLoading] = useState(true);
   const [alias, setAlias] = useState("");
@@ -35,22 +37,40 @@ export default function FoodAliasesAdminScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Food alias queue</Text>
-      <Text style={styles.sub}>Support/Admin — IFCT mapping proposals (editable).</Text>
-      {loading ? <ActivityIndicator /> : null}
+    <ScrollView
+      contentContainerStyle={styles.container}
+      style={{ backgroundColor: c.surface }}>
+      <Text style={[styles.title, { color: c.textPrimary }]}>Food alias queue</Text>
+      <Text style={[styles.sub, { color: c.textMuted }]}>
+        Support/Admin — IFCT mapping proposals (editable).
+      </Text>
+      {loading ? <ActivityIndicator color={c.primary} /> : null}
       {rows.map((r) => (
-        <View key={r.id} style={styles.row}>
-          <Text style={styles.alias}>{r.alias}</Text>
-          <Text style={styles.meta}>{r.foodCode ?? "—"} · {r.status ?? "pending"}</Text>
+        <View key={r.id} style={[styles.row, { backgroundColor: c.surfaceMuted }]}>
+          <Text style={[styles.alias, { color: c.textPrimary }]}>{r.alias}</Text>
+          <Text style={[styles.meta, { color: c.textSecondary }]}>
+            {r.foodCode ?? "—"} · {r.status ?? "pending"}
+          </Text>
         </View>
       ))}
-      <TextInput style={styles.input} placeholder="Alias" value={alias} onChangeText={setAlias} />
-      <TextInput style={styles.input} placeholder="IFCT food code" value={foodCode} onChangeText={setFoodCode} />
-      <Pressable style={styles.btn} onPress={submit}>
-        <Text style={styles.btnText}>Submit alias</Text>
+      <TextInput
+        style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBg, color: c.inputText }]}
+        placeholder="Alias"
+        placeholderTextColor={c.inputPlaceholder}
+        value={alias}
+        onChangeText={setAlias}
+      />
+      <TextInput
+        style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBg, color: c.inputText }]}
+        placeholder="IFCT food code"
+        placeholderTextColor={c.inputPlaceholder}
+        value={foodCode}
+        onChangeText={setFoodCode}
+      />
+      <Pressable style={[styles.btn, { backgroundColor: c.primary }]} onPress={submit}>
+        <Text style={[styles.btnText, { color: c.textOnPrimary }]}>Submit alias</Text>
       </Pressable>
-      {status ? <Text style={styles.status}>{status}</Text> : null}
+      {status ? <Text style={[styles.status, { color: c.textSuccess }]}>{status}</Text> : null}
     </ScrollView>
   );
 }
@@ -58,24 +78,22 @@ export default function FoodAliasesAdminScreen() {
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.sm },
   title: { fontSize: typography.fontSize.xl, fontWeight: "700" },
-  sub: { color: palette.gray500, marginBottom: spacing.md },
-  row: { padding: spacing.sm, backgroundColor: palette.gray100, borderRadius: radii.md },
+  sub: { marginBottom: spacing.md },
+  row: { padding: spacing.sm, borderRadius: radii.md },
   alias: { fontWeight: "700" },
-  meta: { color: palette.gray600, fontSize: typography.fontSize.sm },
+  meta: { fontSize: typography.fontSize.sm },
   input: {
     borderWidth: 1,
-    borderColor: palette.gray200,
     borderRadius: radii.md,
     padding: spacing.sm,
     minHeight: touchTarget.minHeight,
   },
   btn: {
     minHeight: touchTarget.minHeight,
-    backgroundColor: palette.emerald,
     borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { color: palette.white, fontWeight: "700" },
-  status: { color: palette.emeraldDark },
+  btnText: { fontWeight: "700" },
+  status: {},
 });

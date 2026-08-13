@@ -3,6 +3,8 @@
  * Used when cloud program generation is offline or as the immediate client draft.
  */
 
+import { targetMuscleForExercise } from './exerciseTargets';
+
 export type ProgramPrefs = {
   primaryGoal: string;
   trainingExperience: string;
@@ -10,6 +12,12 @@ export type ProgramPrefs = {
   daysPerWeek?: number;
   secondaryPrefs?: string[];
   injuriesInfo?: string;
+  currentPhysique?: string[];
+  goalPhysique?: string[];
+  healthConditions?: string[];
+  painRegions?: string[];
+  /** Muscle/region ids to avoid or deload in today's draft. */
+  avoidRegions?: string[];
 };
 
 export type GeneratedExercise = {
@@ -168,14 +176,47 @@ function applyExperience(ex: GeneratedExercise, experience: string): GeneratedEx
   };
 }
 
+function exerciseTouchesAvoid(name: string, avoid: string[]): boolean {
+  if (!avoid.length) return false;
+  const muscle = targetMuscleForExercise(name).toLowerCase();
+  const n = name.toLowerCase();
+  return avoid.some((a) => {
+    const key = a.toLowerCase().replace(/_/g, ' ');
+    return (
+      muscle.includes(key) ||
+      key.includes(muscle) ||
+      n.includes(key) ||
+      (key.includes('shoulder') && /press|raise|ohp/.test(n)) ||
+      (key.includes('knee') && /squat|lunge/.test(n)) ||
+      (key.includes('elbow') && /curl|extension|pushdown/.test(n)) ||
+      (key.includes('wrist') && /curl|press/.test(n)) ||
+      (key.includes('lower back') && /deadlift|good morning|rdl/.test(n))
+    );
+  });
+}
+
+function resolveGoal(prefs: ProgramPrefs): string {
+  if (prefs.primaryGoal && prefs.primaryGoal !== 'recomp') return prefs.primaryGoal;
+  const want = (prefs.goalPhysique ?? []).join(' ').toLowerCase();
+  if (/leaner|toned/.test(want) && /muscle/.test(want)) return 'recomp';
+  if (/leaner|toned/.test(want)) return 'fat_loss';
+  if (/muscle|stronger|bulky|athletic/.test(want)) return 'muscle_gain';
+  return prefs.primaryGoal || 'recomp';
+}
+
 /**
- * Build an editable multi-day draft from profile/goal preferences.
+ * Build an editable multi-day draft from profile/goal/physique/health preferences.
  */
 export function generateProgramFromPreferences(prefs: ProgramPrefs): GeneratedProgram {
   const days = Math.min(6, Math.max(2, prefs.daysPerWeek ?? 4));
   const gear = equipmentBucket(prefs.equipmentAccess);
-  const pools = pickPool(prefs.primaryGoal || 'recomp', gear);
+  const goal = resolveGoal(prefs);
+  const pools = pickPool(goal, gear);
   const experience = prefs.trainingExperience || 'beginner';
+  const avoid = [
+    ...(prefs.avoidRegions ?? []),
+    ...(prefs.painRegions ?? []).filter((p) => p !== 'none'),
+  ];
 
   const rotation =
     days <= 3
@@ -193,17 +234,36 @@ export function generateProgramFromPreferences(prefs: ProgramPrefs): GeneratedPr
 
   const sessions: GeneratedSession[] = Array.from({ length: days }, (_, i) => {
     const key = rotation[i % rotation.length];
-    const exercises = (pools[key] ?? pools.full)
+    let exercises = (pools[key] ?? pools.full)
       .slice(0, experience === 'beginner' ? 3 : 4)
-      .map((ex) => applyExperience(ex, experience));
-    if (prefs.injuriesInfo?.trim()) {
+      .map((ex) => applyExperience(ex, experience))
+      .filter((ex) => !exerciseTouchesAvoid(ex.name, avoid));
+
+    if (exercises.length < 2) {
+      exercises = [
+        { name: 'Machine or band alternative (pain-aware)', sets: 3, reps: 12 },
+        { name: 'Core brace / breathing', sets: 3, reps: 8 },
+      ];
+    }
+
+    if (prefs.injuriesInfo?.trim() || avoid.length) {
       exercises.push({
-        name: 'Injury-aware mobility / skip pain',
+        name: 'Mobility / skip pain — risk flag only',
         sets: 1,
         reps: 1,
-        notes: `Risk flag only — respect: ${prefs.injuriesInfo.slice(0, 80)}`,
+        notes: `Avoid/deload: ${avoid.join(', ') || 'see injury notes'}`,
       });
     }
+
+    if (prefs.healthConditions?.some((h) => h !== 'none')) {
+      exercises.push({
+        name: 'Keep RPE moderate — health-aware',
+        sets: 1,
+        reps: 1,
+        notes: `Conditions noted: ${prefs.healthConditions.filter((h) => h !== 'none').join(', ')}`,
+      });
+    }
+
     return {
       dayLabel: `Day ${i + 1}`,
       focus: focusLabels[key] ?? key,
@@ -211,10 +271,11 @@ export function generateProgramFromPreferences(prefs: ProgramPrefs): GeneratedPr
     };
   });
 
-  const goalLabel = (prefs.primaryGoal || 'recomp').replace(/_/g, ' ');
+  const goalLabel = goal.replace(/_/g, ' ');
+  const physiqueBit = prefs.goalPhysique?.length ? ` · aiming ${prefs.goalPhysique.join('/')}` : '';
   return {
     title: `${days}-day ${goalLabel} routine`,
-    summary: `Draft from your prefs · ${experience} · ${gear} equipment · editable before you train.`,
+    summary: `Draft from prefs${physiqueBit} · ${experience} · ${gear} · editable before you train.`,
     sessions,
     activeSession: sessions[0],
     source: 'local-prefs',

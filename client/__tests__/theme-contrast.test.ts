@@ -37,6 +37,11 @@ describe('Theme contrast (WCAG AA text)', () => {
     expect(contrastRatio(t.textPrimary, t.surface)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('text on inverse surfaces meets 4.5:1 in both schemes', () => {
+    expect(contrastRatio(themes.light.textOnInverse, themes.light.surfaceInverse)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(themes.dark.textOnInverse, themes.dark.surfaceInverse)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('getThemeColors switches schemes', () => {
     expect(getThemeColors('light').surface).toBe(themes.light.surface);
     expect(getThemeColors('dark').surface).toBe(themes.dark.surface);

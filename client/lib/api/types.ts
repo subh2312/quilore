@@ -20,6 +20,11 @@ export type CoachProgramRequest = {
     daysPerWeek?: number;
     secondaryPrefs?: string[];
     injuriesInfo?: string;
+    currentPhysique?: string[];
+    goalPhysique?: string[];
+    healthConditions?: string[];
+    painRegions?: string[];
+    avoidRegions?: string[];
   };
 };
 export type CoachProgramExercise = { name: string; sets: number; reps: number; notes?: string };

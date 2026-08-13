@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Link, router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AuthScreenLayout } from '@/components/quilore/AuthScreenLayout';
-import { palette, radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { radii, spacing, typography, touchTarget } from '@/constants/DesignTokens';
+import { useThemeColors } from '@/hooks/useTheme';
 import { useAuth } from '@/context/AuthContext';
 import { useMarkObserveInteractive } from '@/hooks/useMarkObserveInteractive';
 
 export default function SignUpScreen() {
   useMarkObserveInteractive();
+  const c = useThemeColors();
   const { signUp } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -30,55 +32,61 @@ export default function SignUpScreen() {
 
   return (
     <AuthScreenLayout>
-      <Text style={styles.title}>Create your account</Text>
-      <Text style={styles.subtitle}>Start with coaching estimates you can always edit.</Text>
+      <Text style={[styles.title, { color: c.textPrimary }]}>Create your account</Text>
+      <Text style={[styles.subtitle, { color: c.textSecondary }]}>
+        Start with coaching estimates you can always edit.
+      </Text>
 
-      <Text style={styles.label}>Display name</Text>
+      <Text style={[styles.label, { color: c.textPrimary }]}>Display name</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBg, color: c.inputText }]}
         autoComplete="name"
         value={displayName}
         onChangeText={setDisplayName}
         placeholder="Your name"
-        placeholderTextColor={palette.gray400}
+        placeholderTextColor={c.inputPlaceholder}
       />
 
-      <Text style={styles.label}>Email</Text>
+      <Text style={[styles.label, { color: c.textPrimary }]}>Email</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBg, color: c.inputText }]}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
         placeholder="you@example.com"
-        placeholderTextColor={palette.gray400}
+        placeholderTextColor={c.inputPlaceholder}
       />
 
-      <Text style={styles.label}>Password</Text>
+      <Text style={[styles.label, { color: c.textPrimary }]}>Password</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBg, color: c.inputText }]}
         secureTextEntry
         autoComplete="new-password"
         value={password}
         onChangeText={setPassword}
         placeholder="At least 8 characters"
-        placeholderTextColor={palette.gray400}
+        placeholderTextColor={c.inputPlaceholder}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: c.textDanger }]}>{error}</Text> : null}
 
       <Pressable
-        style={[styles.primary, busy && styles.disabled]}
+        style={[styles.primary, { backgroundColor: c.primary }, busy && styles.disabled]}
         disabled={busy || !email || !password || !displayName}
         onPress={submit}
         accessibilityRole="button">
-        {busy ? <ActivityIndicator color={palette.white} /> : <Text style={styles.primaryText}>Sign up</Text>}
+        {busy ? (
+          <ActivityIndicator color={c.textOnPrimary} />
+        ) : (
+          <Text style={[styles.primaryText, { color: c.textOnPrimary }]}>Sign up</Text>
+        )}
       </Pressable>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Already have an account?</Text>
-        <Link href="/(auth)/login" style={styles.link}>
+        <Text style={[styles.footerText, { color: c.textMuted }]}>Already have an account?</Text>
+        <Link href="/(auth)/login" style={[styles.link, { color: c.textSuccess }]}>
           Sign in
         </Link>
       </View>
@@ -87,31 +95,27 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: typography.fontSize.xl, fontWeight: '800', color: palette.gray900 },
-  subtitle: { color: palette.gray600, fontSize: typography.fontSize.md, marginBottom: spacing.sm },
-  label: { fontWeight: '700', color: palette.gray800, marginTop: spacing.sm },
+  title: { fontSize: typography.fontSize.xl, fontWeight: '800' },
+  subtitle: { fontSize: typography.fontSize.md, marginBottom: spacing.sm },
+  label: { fontWeight: '700', marginTop: spacing.sm },
   input: {
     minHeight: touchTarget.minHeight,
     borderWidth: 1,
-    borderColor: palette.gray300,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
-    backgroundColor: palette.white,
     fontSize: typography.fontSize.md,
-    color: palette.gray900,
   },
   primary: {
     marginTop: spacing.md,
     minHeight: touchTarget.minHeight + 4,
-    backgroundColor: palette.emerald,
     borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: { color: palette.white, fontWeight: '800', fontSize: typography.fontSize.md },
+  primaryText: { fontWeight: '800', fontSize: typography.fontSize.md },
   disabled: { opacity: 0.6 },
-  error: { color: palette.red, fontWeight: '600' },
+  error: { fontWeight: '600' },
   footer: { flexDirection: 'row', gap: spacing.xs, justifyContent: 'center', marginTop: spacing.lg },
-  footerText: { color: palette.gray600 },
-  link: { color: palette.emeraldDark, fontWeight: '800' },
+  footerText: {},
+  link: { fontWeight: '800' },
 });

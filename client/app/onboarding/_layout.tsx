@@ -6,6 +6,9 @@ export default function OnboardingLayout() {
       <Stack.Screen name="welcome" />
       <Stack.Screen name="consent" />
       <Stack.Screen name="profile-baseline" />
+      <Stack.Screen name="physique-current" />
+      <Stack.Screen name="physique-goal" />
+      <Stack.Screen name="health-context" />
       <Stack.Screen name="goals" />
     </Stack>
   );

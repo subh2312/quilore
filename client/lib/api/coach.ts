@@ -168,6 +168,11 @@ export async function requestProgramGeneration(
     daysPerWeek: body.preferences?.daysPerWeek ?? 4,
     secondaryPrefs: body.preferences?.secondaryPrefs,
     injuriesInfo: body.preferences?.injuriesInfo,
+    currentPhysique: body.preferences?.currentPhysique,
+    goalPhysique: body.preferences?.goalPhysique,
+    healthConditions: body.preferences?.healthConditions,
+    painRegions: body.preferences?.painRegions,
+    avoidRegions: body.preferences?.avoidRegions,
   };
   const local = generateProgramFromPreferences(prefs);
 
