@@ -50,7 +50,8 @@ describe('Analytics taxonomy', () => {
 
 describe('Feature flags', () => {
   it('reads default high-risk gates', () => {
-    expect(isFlagEnabled(DEFAULT_FLAGS, 'meal_scan')).toBe(false);
+    expect(isFlagEnabled(DEFAULT_FLAGS, 'meal_scan')).toBe(true);
+    expect(isFlagEnabled(DEFAULT_FLAGS, 'program_generation')).toBe(true);
     expect(isFlagEnabled(DEFAULT_FLAGS, 'advanced_coaching')).toBe(true);
   });
 });

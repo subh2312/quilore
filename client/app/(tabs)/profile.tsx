@@ -48,6 +48,7 @@ export default function ProfileScreen() {
   const [injuriesDisclaimer, setInjuriesDisclaimer] = useState('');
 
   const [primaryGoal, setPrimaryGoal] = useState<(typeof GOALS)[number]>('recomp');
+  const [daysPerWeek, setDaysPerWeek] = useState('4');
   const [coachingTone, setCoachingTone] = useState<(typeof TONES)[number]>('supportive');
   const [secondaryPrefs, setSecondaryPrefs] = useState<string[]>([]);
 
@@ -98,6 +99,9 @@ export default function ProfileScreen() {
         if (goal.primaryGoal && (GOALS as readonly string[]).includes(goal.primaryGoal)) {
           setPrimaryGoal(goal.primaryGoal as (typeof GOALS)[number]);
         }
+        if (goal.schedulePrefs && typeof goal.schedulePrefs.daysPerWeek === 'number') {
+          setDaysPerWeek(String(goal.schedulePrefs.daysPerWeek));
+        }
         if (goal.coachingTone && (TONES as readonly string[]).includes(goal.coachingTone)) {
           setCoachingTone(goal.coachingTone as (typeof TONES)[number]);
         }
@@ -143,7 +147,7 @@ export default function ProfileScreen() {
         primaryGoal,
         coachingTone,
         secondaryPrefs,
-        schedulePrefs: { daysPerWeek: 4 },
+        schedulePrefs: { daysPerWeek: Math.min(6, Math.max(2, Number(daysPerWeek) || 4)) },
       });
       const macros = await recalculateMacroTargets(user.id, {
         primaryGoal,
@@ -269,6 +273,13 @@ export default function ProfileScreen() {
       <Text style={styles.section}>Goals & coaching</Text>
       <Text style={styles.label}>Primary goal</Text>
       <ChipRow options={GOALS} value={primaryGoal} onChange={setPrimaryGoal} />
+      <Field
+        label="Training days per week"
+        value={daysPerWeek}
+        onChangeText={setDaysPerWeek}
+        keyboardType="number-pad"
+        placeholder="2–6"
+      />
       <Text style={styles.label}>Coaching tone</Text>
       <ChipRow options={TONES} value={coachingTone} onChange={setCoachingTone} />
       <Text style={styles.label}>Secondary preferences (optional)</Text>

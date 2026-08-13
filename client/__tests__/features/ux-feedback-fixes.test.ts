@@ -1,5 +1,5 @@
 /**
- * UX feedback regressions: meal parse, voice sets, goal→macro mapping.
+ * UX feedback regressions: meal parse, voice sets, goal→macro mapping, prefs programs.
  */
 
 import { parseVoiceSet } from '../../lib/voice/parseVoiceSet';
@@ -9,6 +9,7 @@ import {
   mapGoalToMacroPolicy,
 } from '../../lib/nutrition/macroTargets';
 import { targetMuscleForExercise } from '../../lib/workout/exerciseTargets';
+import { generateProgramFromPreferences } from '../../lib/workout/generateFromPreferences';
 
 describe('Voice set parsing', () => {
   it('parses bench three by eight', () => {
@@ -59,5 +60,29 @@ describe('Goal to macro targets', () => {
 describe('Exercise target muscle', () => {
   it('maps barbell curl to biceps not quads', () => {
     expect(targetMuscleForExercise('Barbell curl')).toBe('biceps');
+  });
+});
+
+describe('Preference-based program generation', () => {
+  it('builds different drafts for fat_loss vs muscle_gain', () => {
+    const cut = generateProgramFromPreferences({
+      primaryGoal: 'fat_loss',
+      trainingExperience: 'beginner',
+      equipmentAccess: 'full gym',
+      daysPerWeek: 4,
+    });
+    const bulk = generateProgramFromPreferences({
+      primaryGoal: 'muscle_gain',
+      trainingExperience: 'advanced',
+      equipmentAccess: 'home dumbbells',
+      daysPerWeek: 4,
+    });
+    expect(cut.sessions).toHaveLength(4);
+    expect(bulk.sessions).toHaveLength(4);
+    expect(cut.activeSession.exercises.length).toBeGreaterThan(0);
+    expect(cut.title.toLowerCase()).toContain('fat loss');
+    expect(bulk.title.toLowerCase()).toContain('muscle gain');
+    const cutNames = cut.sessions.flatMap((s) => s.exercises.map((e) => e.name)).join(' ');
+    expect(cutNames.toLowerCase()).toMatch(/finisher|bike|walk/);
   });
 });

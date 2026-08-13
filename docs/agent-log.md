@@ -4,6 +4,14 @@
 - **Tool:** cursor
 - **Branch:** cursor-ux-feedback-fixes-1811
 - **PR:** https://github.com/subh2312/quilore/pull/15
+- **What:** Preference-based routine generation as Workout primary path; PDF/photo/voice/manual as manage tools. Nutrition modes: manual / meal photo / label / packaged with AI macro calc. Profile days/week drives generation.
+- **Why:** User clarified workouts/routines must come from preferences; capture methods are add/update paths. Same model for nutrition logging.
+- **How:** `generateProgramFromPreferences` + Coach program prefs payload + Spring structured draft; Workout hero CTA; Nutrition capture mode grid; confirm → `calculateMeal`.
+
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-ux-feedback-fixes-1811
+- **PR:** https://github.com/subh2312/quilore/pull/15
 - **What:** Ensure Coach Chat always returns a visible reply (meal-aware local fallback; never silent on 401/quota/offline); degraded AI envelopes include `content.reply`.
 - **Why:** Screenshots showed user messages with only a fake confirmation card — no coach bubble when AI/backend failed.
 - **How:** `sendCoachChat` catches all errors into `localCoachFallback`; unwrap replaces empty/unavailable envelopes; Spring `degradedUnavailable` now embeds a draft reply from the prompt.

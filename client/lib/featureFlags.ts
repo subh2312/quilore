@@ -13,8 +13,8 @@ export function isFlagEnabled(flags: FlagMap, key: string): boolean {
 }
 
 export const DEFAULT_FLAGS: FlagMap = {
-  meal_scan: { enabled: false, rolloutPercent: 0, environment: 'all' },
+  program_generation: { enabled: true, rolloutPercent: 100, environment: 'all' },
+  meal_scan: { enabled: true, rolloutPercent: 100, environment: 'all' },
   advanced_coaching: { enabled: true, rolloutPercent: 100, environment: 'all' },
-  program_generation: { enabled: false, rolloutPercent: 10, environment: 'staging' },
   voice_logging: { enabled: true, rolloutPercent: 100, environment: 'all' },
 };

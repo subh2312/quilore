@@ -1,5 +1,11 @@
 import { apiRequest, ApiClientError } from './client';
-import type { CoachChatRequest, CoachChatResponse, CoachProgramRequest, CoachProgramResponse } from './types';
+import type {
+  CoachChatRequest,
+  CoachChatResponse,
+  CoachProgramExercise,
+  CoachProgramRequest,
+  CoachProgramResponse,
+} from './types';
 import { looksLikeMealLog, parseMealLogItems } from '../nutrition/parseMealLog';
 
 function unwrapCoachReply(envelope: Record<string, unknown>, originalMessage: string): CoachChatResponse {
@@ -154,15 +160,56 @@ export async function sendCoachChat(body: CoachChatRequest): Promise<CoachChatRe
 export async function requestProgramGeneration(
   body: CoachProgramRequest,
 ): Promise<CoachProgramResponse> {
+  const { generateProgramFromPreferences } = await import('../workout/generateFromPreferences');
+  const prefs = {
+    primaryGoal: body.preferences?.primaryGoal ?? body.goalType ?? 'recomp',
+    trainingExperience: body.preferences?.trainingExperience ?? 'beginner',
+    equipmentAccess: body.preferences?.equipmentAccess,
+    daysPerWeek: body.preferences?.daysPerWeek ?? 4,
+    secondaryPrefs: body.preferences?.secondaryPrefs,
+    injuriesInfo: body.preferences?.injuriesInfo,
+  };
+  const local = generateProgramFromPreferences(prefs);
+
   try {
-    const res = await apiRequest<{ queued: { job?: { id?: string } } }>(
-      '/api/coach/program',
-      { method: 'POST', body: { prompt: body.prompt, idempotencyKey: body.goalType } },
-    );
+    const res = await apiRequest<{
+      queued?: { job?: { id?: string }; id?: string };
+      draft?: { content?: { reply?: string }; message?: string };
+      message?: string;
+      program?: {
+        title?: string;
+        sessions?: Array<{ dayLabel: string; focus: string; exercises: CoachProgramExercise[] }>;
+      };
+    }>('/api/coach/program', {
+      method: 'POST',
+      body: {
+        prompt: body.prompt,
+        idempotencyKey: body.goalType ?? prefs.primaryGoal,
+        preferences: prefs,
+      },
+    });
+
+    const apiSessions = res.program?.sessions;
+    const exercises =
+      apiSessions?.[0]?.exercises ??
+      local.activeSession.exercises.map((e) => ({
+        name: e.name,
+        sets: e.sets,
+        reps: e.reps,
+        notes: e.notes,
+      }));
+
     return {
-      jobId: res.queued?.job?.id ?? `job_${Date.now()}`,
-      status: 'queued',
-      message: 'Program generation queued — confirm draft before applying.',
+      jobId: res.queued?.job?.id ?? res.queued?.id ?? `job_${Date.now()}`,
+      status: 'ready_draft',
+      message:
+        res.message ??
+        'Preference-based routine draft ready — edit before training. PDF/photo/voice remain available to update it.',
+      title: res.program?.title ?? local.title,
+      summary: local.summary,
+      exercises,
+      sessions: apiSessions ?? local.sessions,
+      degraded: false,
     };
   } catch (err) {
     if (err instanceof ApiClientError && err.status === 429) {
@@ -174,15 +221,22 @@ export async function requestProgramGeneration(
             ? err.body.message
             : err.message,
         degraded: true,
+        title: local.title,
+        summary: local.summary,
+        exercises: local.activeSession.exercises,
+        sessions: local.sessions,
       };
     }
-    if (err instanceof ApiClientError && err.endpointUnavailable) {
-      return {
-        jobId: `local_${Date.now()}`,
-        status: 'queued',
-        message: 'Program generation queued locally until backend endpoint is available.',
-      };
-    }
-    throw err;
+    // Offline / auth / unavailable — still return a usable preference draft.
+    return {
+      jobId: `local_${Date.now()}`,
+      status: 'local_draft',
+      message: 'Generated from your profile preferences (offline draft — editable).',
+      degraded: true,
+      title: local.title,
+      summary: local.summary,
+      exercises: local.activeSession.exercises,
+      sessions: local.sessions,
+    };
   }
 }

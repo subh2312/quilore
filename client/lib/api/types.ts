@@ -10,8 +10,29 @@ export type CoachChatResponse = {
   degraded?: boolean;
   message?: string;
 };
-export type CoachProgramRequest = { prompt: string; goalType?: string };
-export type CoachProgramResponse = { jobId: string; status: string; message: string; degraded?: boolean };
+export type CoachProgramRequest = {
+  prompt: string;
+  goalType?: string;
+  preferences?: {
+    primaryGoal?: string;
+    trainingExperience?: string;
+    equipmentAccess?: string;
+    daysPerWeek?: number;
+    secondaryPrefs?: string[];
+    injuriesInfo?: string;
+  };
+};
+export type CoachProgramExercise = { name: string; sets: number; reps: number; notes?: string };
+export type CoachProgramResponse = {
+  jobId: string;
+  status: string;
+  message: string;
+  degraded?: boolean;
+  title?: string;
+  summary?: string;
+  exercises?: CoachProgramExercise[];
+  sessions?: Array<{ dayLabel: string; focus: string; exercises: CoachProgramExercise[] }>;
+};
 export type WorkoutExercise = { name: string; sets: number; reps: number; weightKg?: number };
 export type OcrMapRequest = { text: string; source?: string };
 export type OcrMapResponse = {

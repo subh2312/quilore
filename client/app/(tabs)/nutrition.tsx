@@ -27,6 +27,7 @@ import {
 } from "@/lib/nutrition/macroTargets";
 
 type MacroRow = { label: string; consumed: number; target: number; unit?: string };
+type CaptureMode = "manual" | "meal" | "label" | "packaged";
 
 const DEFAULT_TARGETS: MacroTargetSnapshot = {
   goalType: "maintain",
@@ -38,6 +39,13 @@ const DEFAULT_TARGETS: MacroTargetSnapshot = {
   policyVersion: "macro-policy-v1",
   source: "local",
 };
+
+const CAPTURE_MODES: { id: CaptureMode; label: string; hint: string }[] = [
+  { id: "manual", label: "Manual", hint: "Type dishes + household units" },
+  { id: "meal", label: "Meal photo", hint: "Plate / home-cooked meal" },
+  { id: "label", label: "Nutrition label", hint: "Back-of-pack macros" },
+  { id: "packaged", label: "Packaged / drink", hint: "Bar, bottle, packaged food" },
+];
 
 function rowsFromTargets(
   consumed: { calories: number; protein: number; carbs: number; fat: number },
@@ -51,13 +59,29 @@ function rowsFromTargets(
   ];
 }
 
+function defaultLabelForMode(mode: CaptureMode, fileName?: string): string {
+  const hint = fileName?.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+  if (hint && hint.length > 1) return hint;
+  switch (mode) {
+    case "label":
+      return "Nutrition label item";
+    case "packaged":
+      return "Packaged food / drink";
+    case "meal":
+      return "Scanned meal";
+    default:
+      return "Food item";
+  }
+}
+
 export default function NutritionScreen() {
   const { user } = useAuth();
+  const [mode, setMode] = useState<CaptureMode>("manual");
   const [grams, setGrams] = useState(180);
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const [qualityNote, setQualityNote] = useState<string | null>(null);
   const [scanBusy, setScanBusy] = useState(false);
-  const [scanMode, setScanMode] = useState<"meal" | "label" | null>(null);
+  const [calcBusy, setCalcBusy] = useState(false);
   const [targets, setTargets] = useState<MacroTargetSnapshot>(getCachedMacroTargets() ?? DEFAULT_TARGETS);
   const [macros, setMacros] = useState<MacroRow[]>(
     rowsFromTargets({ calories: 0, protein: 0, carbs: 0, fat: 0 }, getCachedMacroTargets() ?? DEFAULT_TARGETS),
@@ -90,30 +114,47 @@ export default function NutritionScreen() {
     })();
   }, [user]);
 
-  async function pickScan(mode: "meal" | "label") {
+  async function applyTotals(
+    totals: { calories: number; proteinG: number; carbsG: number; fatG: number; disclaimer?: string },
+    note: string,
+  ) {
+    setMacros(
+      rowsFromTargets(
+        {
+          calories: Math.round(totals.calories),
+          protein: Math.round(totals.proteinG),
+          carbs: Math.round(totals.carbsG),
+          fat: Math.round(totals.fatG),
+        },
+        targets,
+      ),
+    );
+    setSavedNote(totals.disclaimer ? `${note} · ${totals.disclaimer}` : note);
+  }
+
+  async function pickPhoto(capture: Exclude<CaptureMode, "manual">) {
     setScanBusy(true);
     setSavedNote(null);
+    setQualityNote(null);
     try {
-      track("meal_scan_started", { mode });
+      track("meal_scan_started", { mode: capture });
       const result = await DocumentPicker.getDocumentAsync({
         type: ["image/*", "image/jpeg", "image/png", "image/webp"],
         copyToCacheDirectory: true,
       });
       if (result.canceled) return;
       const asset = result.assets?.[0];
-      const nameHint = asset?.name?.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
-      setScanMode(mode);
-      if (mode === "label") {
-        const label = nameHint && nameHint.length > 1 ? nameHint : "Packaged food";
-        setScanItems([{ id: "label_1", label, confirmed: true }]);
-        setScanPrompt(`Label scan draft: “${label}” — edit name/portion before macros persist.`);
-        setSavedNote("Label photo attached — OCR is on-device first pass; confirm before save.");
-      } else {
-        const label = nameHint && nameHint.length > 1 ? nameHint : "Scanned dish";
-        setScanItems([{ id: "meal_1", label, confirmed: true }]);
-        setScanPrompt(`I see “${label}” from your photo — confirm or rename before macros persist.`);
-        setSavedNote("Meal photo attached — confirm items below (no demo dishes).");
-      }
+      const label = defaultLabelForMode(capture, asset?.name);
+      setMode(capture);
+      setScanItems([{ id: `${capture}_1`, label, confirmed: true }]);
+      setScanPrompt(
+        capture === "label"
+          ? `Label photo draft: “${label}” — confirm name, then AI estimates macros from portion.`
+          : capture === "packaged"
+            ? `Packaged item draft: “${label}” — confirm, then AI calculates from estimate grams.`
+            : `Meal photo draft: “${label}” — confirm dishes, then AI calculates macros.`,
+      );
+      setSavedNote("Photo attached — confirm items below. Macros calculate after confirm (editable).");
     } catch (err) {
       setSavedNote(err instanceof Error ? err.message : "Could not open camera roll / files.");
     } finally {
@@ -125,7 +166,7 @@ export default function NutritionScreen() {
     const id = `meal_${Date.now()}`;
     upsertLocal("meals", id, { lines, source: "manual" });
     track("meal_logged", { mealId: id, itemCount: lines.length, source: "manual" });
-    setSavedNote(`Saved ${lines.length} items offline — will sync via Spring Boot.`);
+    setSavedNote(`Saved ${lines.length} items — calculating macros…`);
     try {
       const totals = await calculateMeal(
         lines.map((line) => ({
@@ -133,37 +174,46 @@ export default function NutritionScreen() {
           grams: line.unit === "g" ? Number(line.amount) || 100 : undefined,
         })),
       );
-      setMacros(
-        rowsFromTargets(
-          {
-            calories: Math.round(totals.calories),
-            protein: Math.round(totals.proteinG),
-            carbs: Math.round(totals.carbsG),
-            fat: Math.round(totals.fatG),
-          },
-          targets,
-        ),
-      );
-      setSavedNote(`${totals.disclaimer} · ${lines.length} items queued for sync.`);
+      await applyTotals(totals, `${lines.length} manual items queued for sync`);
     } catch {
-      /* keep offline note */
+      setSavedNote(`Saved ${lines.length} items offline — will sync via Spring Boot.`);
     }
   }
 
   async function confirmScan() {
     const confirmed = scanItems.filter((i) => i.confirmed);
-    setSavedNote("Scan list confirmed — still editable.");
+    if (!confirmed.length) {
+      setSavedNote("Select at least one item to calculate.");
+      return;
+    }
+    setCalcBusy(true);
+    setSavedNote("AI calculating macros…");
     try {
+      const totals = await calculateMeal(confirmed.map((i) => ({ name: i.label, grams })));
+      await applyTotals(
+        totals,
+        `Calculated from ${mode} capture (${confirmed.map((i) => i.label).join(", ")})`,
+      );
+      upsertLocal(
+        "meals",
+        `meal_scan_${Date.now()}`,
+        { items: confirmed, grams, source: mode },
+        true,
+      );
+      track("meal_logged", { mealId: `scan_${Date.now()}`, itemCount: confirmed.length, source: mode });
+
       const quality = await fetchFoodQuality({
         items: confirmed.map((i) => ({ name: i.label, grams })),
-        mealType: "lunch",
+        mealType: mode === "packaged" ? "snack" : "meal",
       });
       setQualityNote(quality.feedback);
       if (quality.degraded && quality.message) {
         setSavedNote(quality.message);
       }
-    } catch {
-      setQualityNote(null);
+    } catch (err) {
+      setSavedNote(err instanceof Error ? err.message : "Macro calculation failed — edit and retry.");
+    } finally {
+      setCalcBusy(false);
     }
   }
 
@@ -178,56 +228,85 @@ export default function NutritionScreen() {
         keyboardDismissMode="on-drag">
         <Text style={styles.title}>Nutrition</Text>
         <Text style={styles.subtitle}>
-          Daily macros · scan meal/label · manual composer
-          {targets.primaryGoal ? ` · goal: ${targets.primaryGoal.replace("_", " ")}` : ""}
+          Log manually or from photos — AI estimates macros · goal:{" "}
+          {(targets.primaryGoal || "maintain").replace("_", " ")}
         </Text>
         <MacroProgressCard macros={macros} />
 
-        <Text style={styles.section}>Scan food</Text>
-        <Text style={styles.hint}>Use the camera roll or files to scan a plate or packaged label.</Text>
-        <View style={styles.scanRow}>
-          <Pressable
-            style={[styles.scanBtn, scanBusy && styles.disabled]}
-            onPress={() => pickScan("meal")}
-            disabled={scanBusy}
-            accessibilityRole="button"
-            accessibilityLabel="Scan meal photo">
-            {scanBusy && scanMode === "meal" ? (
-              <ActivityIndicator color={palette.white} />
-            ) : (
-              <Text style={styles.scanBtnText}>Scan meal</Text>
-            )}
-          </Pressable>
-          <Pressable
-            style={[styles.scanBtnSecondary, scanBusy && styles.disabled]}
-            onPress={() => pickScan("label")}
-            disabled={scanBusy}
-            accessibilityRole="button"
-            accessibilityLabel="Scan nutrition label">
-            <Text style={styles.scanBtnSecondaryText}>Scan label</Text>
-          </Pressable>
+        <Text style={styles.section}>How do you want to log?</Text>
+        <View style={styles.modeGrid}>
+          {CAPTURE_MODES.map((m) => (
+            <Pressable
+              key={m.id}
+              style={[styles.modeChip, mode === m.id && styles.modeChipOn]}
+              onPress={() => {
+                setMode(m.id);
+                if (m.id === "manual") {
+                  setScanItems([]);
+                  setScanPrompt(null);
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={m.label}>
+              <Text style={[styles.modeLabel, mode === m.id && styles.modeLabelOn]}>{m.label}</Text>
+              <Text style={styles.modeHint}>{m.hint}</Text>
+            </Pressable>
+          ))}
         </View>
 
-        {scanItems.length > 0 ? (
+        {mode === "manual" ? (
           <>
-            <Text style={styles.section}>Scanned meal estimate</Text>
-            <PortionRangeSlider grams={grams} calLow={calLow} calHigh={calHigh} onChangeGrams={setGrams} />
-            {scanPrompt ? (
-              <ConfirmationChatCard
-                prompt={scanPrompt}
-                items={scanItems}
-                onToggle={(id) =>
-                  setScanItems((prev) => prev.map((i) => (i.id === id ? { ...i, confirmed: !i.confirmed } : i)))
-                }
-                onConfirmAll={confirmScan}
-              />
+            <Text style={styles.section}>Manual log</Text>
+            <ManualMealComposer onSave={saveManual} />
+          </>
+        ) : (
+          <>
+            <Text style={styles.section}>
+              {mode === "meal" ? "Meal photo" : mode === "label" ? "Nutrition label" : "Packaged food / drink"}
+            </Text>
+            <Text style={styles.hint}>
+              Capture a photo — confirm what AI detected — macros calculate automatically (still editable).
+            </Text>
+            <Pressable
+              style={[styles.primary, scanBusy && styles.disabled]}
+              onPress={() => pickPhoto(mode)}
+              disabled={scanBusy}
+              accessibilityRole="button">
+              {scanBusy ? (
+                <ActivityIndicator color={palette.white} />
+              ) : (
+                <Text style={styles.primaryText}>
+                  {mode === "meal"
+                    ? "Take / pick meal photo"
+                    : mode === "label"
+                      ? "Take / pick label photo"
+                      : "Take / pick packaged item photo"}
+                </Text>
+              )}
+            </Pressable>
+
+            {scanItems.length > 0 ? (
+              <>
+                <PortionRangeSlider grams={grams} calLow={calLow} calHigh={calHigh} onChangeGrams={setGrams} />
+                {scanPrompt ? (
+                  <ConfirmationChatCard
+                    prompt={scanPrompt}
+                    items={scanItems}
+                    onToggle={(id) =>
+                      setScanItems((prev) =>
+                        prev.map((i) => (i.id === id ? { ...i, confirmed: !i.confirmed } : i)),
+                      )
+                    }
+                    onConfirmAll={confirmScan}
+                  />
+                ) : null}
+                {calcBusy ? <Text style={styles.note}>Calculating macros…</Text> : null}
+              </>
             ) : null}
           </>
-        ) : null}
+        )}
 
         {qualityNote ? <Text style={styles.note}>{qualityNote}</Text> : null}
-        <Text style={styles.section}>Manual composer</Text>
-        <ManualMealComposer onSave={saveManual} />
         {savedNote ? <Text style={styles.note}>{savedNote}</Text> : null}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -242,26 +321,29 @@ const styles = StyleSheet.create({
   section: { fontSize: typography.fontSize.md, fontWeight: "700", color: semantic.textPrimary },
   hint: { fontSize: typography.fontSize.sm, color: semantic.textSecondary, marginTop: -spacing.sm },
   note: { color: palette.emeraldDark, fontSize: typography.fontSize.sm },
-  scanRow: { flexDirection: "row", gap: spacing.sm },
-  scanBtn: {
-    flex: 1,
+  modeGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  modeChip: {
+    width: "48%",
+    minHeight: 72,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: semantic.border,
+    backgroundColor: semantic.surfaceMuted,
+    padding: spacing.sm,
+    justifyContent: "center",
+    gap: 2,
+  },
+  modeChipOn: { borderColor: palette.emerald, backgroundColor: semantic.confirmSoft },
+  modeLabel: { fontWeight: "700", color: semantic.textPrimary },
+  modeLabelOn: { color: palette.emeraldDark },
+  modeHint: { fontSize: typography.fontSize.xs, color: semantic.textMuted },
+  primary: {
     minHeight: touchTarget.minHeight,
     backgroundColor: palette.emerald,
     borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  scanBtnText: { color: semantic.textOnPrimary, fontWeight: "700" },
-  scanBtnSecondary: {
-    flex: 1,
-    minHeight: touchTarget.minHeight,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: palette.emerald,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: semantic.surface,
-  },
-  scanBtnSecondaryText: { color: palette.emeraldDark, fontWeight: "700" },
+  primaryText: { color: semantic.textOnPrimary, fontWeight: "700" },
   disabled: { opacity: 0.6 },
 });
