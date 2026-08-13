@@ -1,5 +1,13 @@
 # Agent Log
 
+- **Date:** 2026-08-13
+- **Tool:** cursor
+- **Branch:** cursor-fix-pi-deploy-cloudflared-b3f3
+- **PR:** (pending)
+- **What:** Clarified/fixed Pi deploy job: cloudflared install is for the GitHub Actions runner (SSH via tunnel), not the Pi; pinned 2026.7.3 with retries after release CDN 503.
+- **Why:** Merge deploy failed at "Install cloudflared" with HTTP 503; Pi already has the tunnel connector.
+- **How:** Skip if present; retry downloads; document runner-vs-Pi; arm64 images from failed run already published — re-run deploy after merge.
+
 - **Date:** 2026-08-12
 - **Tool:** cursor
 - **Branch:** cursor-uat-pi-cloudflare-b3f3
